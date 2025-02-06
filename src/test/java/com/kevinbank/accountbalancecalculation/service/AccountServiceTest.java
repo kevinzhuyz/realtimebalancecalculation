@@ -35,7 +35,7 @@ public class AccountServiceTest {
     void deposit_Success() {
         // Arrange
         Account account = new Account();
-        account.setCardId("6");
+        account.setCardId(6L);
         account.setBalance(new BigDecimal("1000.00"));
 
         when(accountMapper.findById(6L)).thenReturn(account);
@@ -48,14 +48,14 @@ public class AccountServiceTest {
         // Assert
         assertNotNull(result);
         assertEquals(new BigDecimal("1100.00"), result.getBalance());
-        verify(accountMapper, times(1)).updateBalance(eq("6"), eq(new BigDecimal("1100.00")));
+        verify(accountMapper, times(1)).updateBalance(eq(6L), eq(new BigDecimal("1100.00")));
     }
 
     @Test
     void withdraw_Success() {
         // Arrange
         Account account = new Account();
-        account.setCardId("6");
+        account.setCardId(6L);
         account.setBalance(new BigDecimal("1000.00"));
 
         when(accountMapper.findById(6L)).thenReturn(account);
@@ -68,14 +68,14 @@ public class AccountServiceTest {
         // Assert
         assertNotNull(result);
         assertEquals(new BigDecimal("900.00"), result.getBalance());
-        verify(accountMapper, times(1)).updateBalance(eq("6"), eq(new BigDecimal("900.00")));
+        verify(accountMapper, times(1)).updateBalance(eq(6L), eq(new BigDecimal("900.00")));
     }
 
     @Test
     void withdraw_InsufficientBalance() {
         // Arrange
         Account account = new Account();
-        account.setCardId("6");
+        account.setCardId(6L);
         account.setBalance(new BigDecimal("50.00"));
 
         when(accountMapper.findById(6L)).thenReturn(account);
