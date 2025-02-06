@@ -38,11 +38,11 @@ public class TransactionServiceTest {
     void transfer_Success() {
         // Arrange
         Account sourceAccount = new Account();
-        sourceAccount.setCardId("6");
+        sourceAccount.setCardId(6L);
         sourceAccount.setBalance(new BigDecimal("1000.00"));
 
         Account targetAccount = new Account();
-        targetAccount.setCardId("7");
+        targetAccount.setCardId(7L);
         targetAccount.setBalance(new BigDecimal("500.00"));
 
         when(accountMapper.findById(6L)).thenReturn(sourceAccount);
@@ -59,19 +59,19 @@ public class TransactionServiceTest {
         assertEquals("6", result.getSourceCardId());
         assertEquals("7", result.getTargetCardId());
         assertEquals(new BigDecimal("100.00"), result.getAmount());
-        verify(accountMapper, times(1)).updateBalance(eq("6"), eq(new BigDecimal("900.00")));
-        verify(accountMapper, times(1)).updateBalance(eq("7"), eq(new BigDecimal("600.00")));
+        verify(accountMapper, times(1)).updateBalance(eq(6L), eq(new BigDecimal("900.00")));
+        verify(accountMapper, times(1)).updateBalance(eq(7L), eq(new BigDecimal("600.00")));
     }
 
     @Test
     void transfer_InsufficientBalance() {
         // Arrange
         Account sourceAccount = new Account();
-        sourceAccount.setCardId("6");
+        sourceAccount.setCardId(6L);
         sourceAccount.setBalance(new BigDecimal("50.00"));
 
         Account targetAccount = new Account();
-        targetAccount.setCardId("7");
+        targetAccount.setCardId(7L);
         targetAccount.setBalance(new BigDecimal("500.00"));
 
         when(accountMapper.findById(6L)).thenReturn(sourceAccount);
