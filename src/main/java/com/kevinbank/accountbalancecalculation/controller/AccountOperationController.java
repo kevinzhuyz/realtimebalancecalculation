@@ -1,47 +1,47 @@
 package com.kevinbank.accountbalancecalculation.controller;
 
-import com.kevinbank.accountbalancecalculation.domain.Account;
+import com.kevinbank.accountbalancecalculation.model.Account;
 import com.kevinbank.accountbalancecalculation.service.AccountService;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
 
+@Slf4j
 @RestController
-@RequestMapping("/api/accounts/operations")
+@RequestMapping("/api/accounts")
 public class AccountOperationController {
     
-    private final AccountService accountService;
+    @Autowired
+    private AccountService accountService;
     
-    public AccountOperationController(AccountService accountService) {
-        this.accountService = accountService;
-    }
-    
-    @PostMapping("/{cardId}/deposit")
-    public ResponseEntity<?> deposit(
-            @PathVariable String cardId,
+    @PostMapping("/{id}/deposit")
+    public ResponseEntity<Account> deposit(
+            @PathVariable Long id,
             @RequestParam BigDecimal amount) {
+        log.info("存款请求 - 账户ID: {}, 金额: {}", id, amount);
         try {
-            Account updatedAccount = accountService.deposit(cardId, amount);
-            return ResponseEntity.ok(updatedAccount);
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(e.getMessage());
+            Account account = accountService.deposit(id, amount);
+            return ResponseEntity.ok(account);
         } catch (Exception e) {
-            return ResponseEntity.internalServerError().body("Deposit failed: " + e.getMessage());
+            log.error("存款失败", e);
+            throw e;
         }
     }
     
-    @PostMapping("/{cardId}/withdraw")
-    public ResponseEntity<?> withdraw(
-            @PathVariable String cardId,
+    @PostMapping("/{id}/withdraw")
+    public ResponseEntity<Account> withdraw(
+            @PathVariable Long id,
             @RequestParam BigDecimal amount) {
+        log.info("取款请求 - 账户ID: {}, 金额: {}", id, amount);
         try {
-            Account updatedAccount = accountService.withdraw(cardId, amount);
-            return ResponseEntity.ok(updatedAccount);
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(e.getMessage());
+            Account account = accountService.withdraw(id, amount);
+            return ResponseEntity.ok(account);
         } catch (Exception e) {
-            return ResponseEntity.internalServerError().body("Withdrawal failed: " + e.getMessage());
+            log.error("取款失败", e);
+            throw e;
         }
     }
 } 

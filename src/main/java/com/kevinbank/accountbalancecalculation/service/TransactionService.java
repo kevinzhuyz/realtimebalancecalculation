@@ -1,12 +1,16 @@
 package com.kevinbank.accountbalancecalculation.service;
 
-import com.kevinbank.accountbalancecalculation.domain.Transaction;
-import java.math.BigDecimal;
+import com.kevinbank.accountbalancecalculation.model.Transaction;
+import com.kevinbank.accountbalancecalculation.model.CreateTransactionRequest;
 import java.util.List;
 
 public interface TransactionService {
-    Transaction transfer(String sourceCardId, String targetCardId, BigDecimal amount);
-    List<Transaction> getTransactionsByCardId(String cardId);
-    Transaction getTransactionById(String transactionId);
+    
+    Transaction createTransaction(CreateTransactionRequest request);
+    
+    List<Transaction> getTransactionsByAccountId(Long accountId);
+    
+    Transaction getTransactionById(Long id);
+    
     List<Transaction> getAllTransactions();
 } 

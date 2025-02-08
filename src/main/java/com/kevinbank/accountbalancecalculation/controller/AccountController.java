@@ -1,8 +1,10 @@
 package com.kevinbank.accountbalancecalculation.controller;
 
-import com.kevinbank.accountbalancecalculation.domain.Account;
-import com.kevinbank.accountbalancecalculation.domain.Transaction;
+import com.kevinbank.accountbalancecalculation.model.Account;
+import com.kevinbank.accountbalancecalculation.model.CreateAccountRequest;
 import com.kevinbank.accountbalancecalculation.service.AccountService;
+import jakarta.validation.Valid;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -13,41 +15,32 @@ import java.util.List;
 @RequestMapping("/api/accounts")
 public class AccountController {
     
-    private final AccountService accountService;
+    @Autowired
+    private AccountService accountService;
     
-    public AccountController(AccountService accountService) {
-        this.accountService = accountService;
+    @PostMapping
+    public ResponseEntity<Account> createAccount(@Valid @RequestBody CreateAccountRequest request) {
+        Account account = accountService.createAccount(request);
+        return ResponseEntity.ok(account);
     }
     
-    @GetMapping("/{cardId}")
-    public ResponseEntity<Account> getAccount(@PathVariable Long cardId) {
-        Account account = accountService.getAccount(cardId);
-        return account != null ? ResponseEntity.ok(account) : ResponseEntity.notFound().build();
+    @PutMapping("/{id}/balance")
+    public ResponseEntity<Void> updateBalance(
+            @PathVariable Long id,
+            @RequestParam BigDecimal amount) {
+        accountService.updateBalance(id, amount);
+        return ResponseEntity.ok().build();
+    }
+    
+    @GetMapping("/{id}")
+    public ResponseEntity<Account> getAccount(@PathVariable Long id) {
+        Account account = accountService.getAccountById(id);
+        return ResponseEntity.ok(account);
     }
     
     @GetMapping
     public ResponseEntity<List<Account>> getAllAccounts() {
-        return ResponseEntity.ok(accountService.getAllAccounts());
-    }
-    
-    @PostMapping
-    public ResponseEntity<Account> createAccount(@RequestBody Account account) {
-        return ResponseEntity.ok(accountService.createAccount(account));
-    }
-    
-    @PostMapping("/transfer")
-    public ResponseEntity<String> transfer(
-            @RequestParam String sourceCardId,
-            @RequestParam String targetCardId,
-            @RequestParam BigDecimal amount) {
-        boolean success = accountService.transfer(sourceCardId, targetCardId, amount);
-        return success ? 
-                ResponseEntity.ok("Transfer successful") : 
-                ResponseEntity.badRequest().body("Transfer failed");
-    }
-    
-    @GetMapping("/{cardId}/transactions")
-    public ResponseEntity<List<Transaction>> getTransactionHistory(@PathVariable String cardId) {
-        return ResponseEntity.ok(accountService.getTransactionHistory(cardId));
+        List<Account> accounts = accountService.getAllAccounts();
+        return ResponseEntity.ok(accounts);
     }
 } 

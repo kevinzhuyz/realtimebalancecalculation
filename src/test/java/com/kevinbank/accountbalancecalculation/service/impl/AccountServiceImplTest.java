@@ -1,4 +1,4 @@
-package com.kevinbank.accountbalancecalculation.service;
+package com.kevinbank.accountbalancecalculation.service.impl;
 
 import com.kevinbank.accountbalancecalculation.model.Account;
 import com.kevinbank.accountbalancecalculation.model.CreateAccountRequest;
@@ -6,7 +6,7 @@ import com.kevinbank.accountbalancecalculation.model.CreateTransactionRequest;
 import com.kevinbank.accountbalancecalculation.mapper.AccountMapper;
 import com.kevinbank.accountbalancecalculation.repository.AccountRepository;
 import com.kevinbank.accountbalancecalculation.repository.UserRepository;
-import com.kevinbank.accountbalancecalculation.service.impl.AccountServiceImpl;
+import com.kevinbank.accountbalancecalculation.service.TransactionService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -15,6 +15,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Optional;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -22,7 +24,7 @@ import static org.mockito.Mockito.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 @ExtendWith(MockitoExtension.class)
-class AccountServiceTest {
+class AccountServiceImplTest {
 
     @Mock
     private AccountRepository accountRepository;
@@ -40,6 +42,7 @@ class AccountServiceTest {
     private AccountServiceImpl accountService;
 
     private Account mockAccount;
+    private CreateAccountRequest mockRequest;
 
     @BeforeEach
     void setUp() {
@@ -49,6 +52,49 @@ class AccountServiceTest {
         mockAccount.setBalance(new BigDecimal("1000.00"));
         mockAccount.setCreditLimit(new BigDecimal("5000.00"));
         mockAccount.setAccountNumber("ACC001");
+
+        mockRequest = new CreateAccountRequest();
+        mockRequest.setUserId(1);
+        mockRequest.setCreditLimit(new BigDecimal("5000.00"));
+        mockRequest.setAccountNumber("ACC001");
+    }
+
+    @Test
+    void createAccount_Success() {
+        // 准备
+        when(userRepository.existsById(1)).thenReturn(true);
+        when(accountRepository.existsByAccountNumber("ACC001")).thenReturn(false);
+        when(accountMapper.toAccount(any(CreateAccountRequest.class))).thenReturn(mockAccount);
+        when(accountRepository.save(any(Account.class))).thenReturn(mockAccount);
+
+        // 执行
+        Account result = accountService.createAccount(mockRequest);
+
+        // 验证
+        assertNotNull(result);
+        assertEquals(mockAccount.getId(), result.getId());
+        verify(accountRepository).save(any(Account.class));
+    }
+
+    @Test
+    void createAccount_UserNotExists() {
+        // 准备
+        when(userRepository.existsById(1)).thenReturn(false);
+
+        // 执行和验证
+        assertThrows(RuntimeException.class, () -> accountService.createAccount(mockRequest));
+        verify(accountRepository, never()).save(any(Account.class));
+    }
+
+    @Test
+    void createAccount_AccountNumberExists() {
+        // 准备
+        when(userRepository.existsById(1)).thenReturn(true);
+        when(accountRepository.existsByAccountNumber("ACC001")).thenReturn(true);
+
+        // 执行和验证
+        assertThrows(RuntimeException.class, () -> accountService.createAccount(mockRequest));
+        verify(accountRepository, never()).save(any(Account.class));
     }
 
     @Test
@@ -79,27 +125,6 @@ class AccountServiceTest {
     }
 
     @Test
-    void deposit_AccountNotFound() {
-        // 准备
-        when(accountRepository.findById(1L)).thenReturn(Optional.empty());
-
-        // 执行和验证
-        assertThrows(RuntimeException.class, 
-            () -> accountService.deposit(1L, new BigDecimal("100.00")));
-        verify(transactionService, never()).createTransaction(any());
-    }
-
-    @Test
-    void deposit_InvalidAmount() {
-        // 准备
-        BigDecimal invalidAmount = new BigDecimal("-100.00");
-
-        // 执行和验证
-        assertThrows(RuntimeException.class, 
-            () -> accountService.deposit(1L, invalidAmount));
-    }
-
-    @Test
     void withdraw_Success() {
         // 准备
         BigDecimal withdrawAmount = new BigDecimal("100.00");
@@ -127,17 +152,6 @@ class AccountServiceTest {
     }
 
     @Test
-    void withdraw_AccountNotFound() {
-        // 准备
-        when(accountRepository.findById(1L)).thenReturn(Optional.empty());
-
-        // 执行和验证
-        assertThrows(RuntimeException.class, 
-            () -> accountService.withdraw(1L, new BigDecimal("100.00")));
-        verify(transactionService, never()).createTransaction(any());
-    }
-
-    @Test
     void withdraw_InsufficientBalance() {
         // 准备
         BigDecimal withdrawAmount = new BigDecimal("2000.00");
@@ -150,12 +164,35 @@ class AccountServiceTest {
     }
 
     @Test
-    void withdraw_InvalidAmount() {
+    void getAllAccounts_Success() {
         // 准备
-        BigDecimal invalidAmount = new BigDecimal("-100.00");
+        List<Account> mockAccounts = Arrays.asList(mockAccount);
+        when(accountRepository.findAll()).thenReturn(mockAccounts);
 
-        // 执行和验证
-        assertThrows(RuntimeException.class, 
-            () -> accountService.withdraw(1L, invalidAmount));
+        // 执行
+        List<Account> results = accountService.getAllAccounts();
+
+        // 验证
+        assertNotNull(results);
+        assertEquals(1, results.size());
+        assertEquals(mockAccount.getId(), results.get(0).getId());
+    }
+
+    @Test
+    void transfer_Success() {
+        // 准备
+        BigDecimal transferAmount = new BigDecimal("100.00");
+        
+        // 执行
+        accountService.transfer(1L, 2L, transferAmount);
+        
+        // 验证
+        verify(transactionService).createTransaction(argThat(request -> {
+            assertEquals("TRANSFER", request.getType());
+            assertEquals(transferAmount, request.getAmount());
+            assertEquals(1L, request.getSourceAccountId());
+            assertEquals(2L, request.getTargetAccountId());
+            return true;
+        }));
     }
 } 

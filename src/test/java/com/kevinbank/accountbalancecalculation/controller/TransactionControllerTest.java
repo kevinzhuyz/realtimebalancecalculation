@@ -1,76 +1,126 @@
 package com.kevinbank.accountbalancecalculation.controller;
 
-import com.kevinbank.accountbalancecalculation.domain.Transaction;
+import com.kevinbank.accountbalancecalculation.model.Transaction;
+import com.kevinbank.accountbalancecalculation.model.CreateTransactionRequest;
 import com.kevinbank.accountbalancecalculation.service.TransactionService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import org.mockito.MockitoAnnotations;
+import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.ResponseEntity;
 
 import java.math.BigDecimal;
 import java.util.Arrays;
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.when;
+import static org.junit.jupiter.api.Assertions.*;
 
-public class TransactionControllerTest {
+@ExtendWith(MockitoExtension.class)
+class TransactionControllerTest {
 
     @Mock
     private TransactionService transactionService;
 
+    @InjectMocks
     private TransactionController transactionController;
+
+    private Transaction mockTransaction;
+    private CreateTransactionRequest mockRequest;
 
     @BeforeEach
     void setUp() {
-        MockitoAnnotations.openMocks(this);
-        transactionController = new TransactionController(transactionService);
+        // 准备测试数据
+        mockTransaction = new Transaction();
+        mockTransaction.setId(1L);
+        mockTransaction.setAmount(new BigDecimal("100.00"));
+        mockTransaction.setType("TRANSFER");
+
+        mockRequest = new CreateTransactionRequest();
+        mockRequest.setSourceAccountId(1L);
+        mockRequest.setTargetAccountId(2L);
+        mockRequest.setAmount(new BigDecimal("100.00"));
+        mockRequest.setType("TRANSFER");
     }
 
     @Test
-    void transfer_Success() {
-        // Arrange
-        Transaction mockTransaction = new Transaction();
-        mockTransaction.setTransactionId("123");
-        when(transactionService.transfer(any(), any(), any())).thenReturn(mockTransaction);
+    void transfer_ShouldReturnTransaction() {
+        // 准备
+        when(transactionService.createTransaction(any(CreateTransactionRequest.class)))
+                .thenReturn(mockTransaction);
 
-        // Act
-        ResponseEntity<?> response = transactionController.transfer(
-            "6", "7", new BigDecimal("100.00")
+        // 执行
+        ResponseEntity<Transaction> response = transactionController.transfer(
+                mockRequest.getSourceAccountId(),
+                mockRequest.getTargetAccountId(),
+                mockRequest.getAmount()
         );
 
-        // Assert
-        assertTrue(response.getStatusCode().is2xxSuccessful());
+        // 验证
+        assertNotNull(response);
+        assertEquals(200, response.getStatusCodeValue());
         assertEquals(mockTransaction, response.getBody());
     }
 
     @Test
-    void transfer_InvalidAmount() {
-        // Act
-        ResponseEntity<?> response = transactionController.transfer(
-            "6", "7", new BigDecimal("-100.00")
-        );
+    void createTransaction_ShouldReturnTransaction() {
+        // 准备
+        when(transactionService.createTransaction(any(CreateTransactionRequest.class)))
+                .thenReturn(mockTransaction);
 
-        // Assert
-        assertTrue(response.getStatusCode().is4xxClientError());
-        verify(transactionService, never()).transfer(any(), any(), any());
+        // 执行
+        ResponseEntity<Transaction> response = transactionController.createTransaction(mockRequest);
+
+        // 验证
+        assertNotNull(response);
+        assertEquals(200, response.getStatusCodeValue());
+        assertEquals(mockTransaction, response.getBody());
     }
 
     @Test
-    void getTransactionHistory_Success() {
-        // Arrange
-        List<Transaction> mockTransactions = Arrays.asList(
-            new Transaction(), new Transaction()
-        );
-        when(transactionService.getTransactionsByCardId("6")).thenReturn(mockTransactions);
+    void getTransactionsByAccountId_ShouldReturnTransactionList() {
+        // 准备
+        List<Transaction> mockTransactions = Arrays.asList(mockTransaction);
+        when(transactionService.getTransactionsByAccountId(1L)).thenReturn(mockTransactions);
 
-        // Act
-        ResponseEntity<List<Transaction>> response = transactionController.getTransactionHistory("6");
+        // 执行
+        ResponseEntity<List<Transaction>> response = transactionController.getTransactionsByAccountId(1L);
 
-        // Assert
-        assertTrue(response.getStatusCode().is2xxSuccessful());
-        assertEquals(2, response.getBody().size());
+        // 验证
+        assertNotNull(response);
+        assertEquals(200, response.getStatusCodeValue());
+        assertEquals(mockTransactions, response.getBody());
+    }
+
+    @Test
+    void getTransaction_ShouldReturnTransaction() {
+        // 准备
+        when(transactionService.getTransactionById(1L)).thenReturn(mockTransaction);
+
+        // 执行
+        ResponseEntity<Transaction> response = transactionController.getTransaction(1L);
+
+        // 验证
+        assertNotNull(response);
+        assertEquals(200, response.getStatusCodeValue());
+        assertEquals(mockTransaction, response.getBody());
+    }
+
+    @Test
+    void getAllTransactions_ShouldReturnTransactionList() {
+        // 准备
+        List<Transaction> mockTransactions = Arrays.asList(mockTransaction);
+        when(transactionService.getAllTransactions()).thenReturn(mockTransactions);
+
+        // 执行
+        ResponseEntity<List<Transaction>> response = transactionController.getAllTransactions();
+
+        // 验证
+        assertNotNull(response);
+        assertEquals(200, response.getStatusCodeValue());
+        assertEquals(mockTransactions, response.getBody());
     }
 } 
