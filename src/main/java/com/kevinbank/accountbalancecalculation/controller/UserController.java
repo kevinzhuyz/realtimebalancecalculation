@@ -3,9 +3,7 @@ package com.kevinbank.accountbalancecalculation.controller;
 import com.kevinbank.accountbalancecalculation.model.User;
 import com.kevinbank.accountbalancecalculation.model.CreateUserRequest;
 import com.kevinbank.accountbalancecalculation.service.UserService;
-import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -16,14 +14,23 @@ public class UserController {
     private UserService userService;
     
     @PostMapping
-    public ResponseEntity<User> createUser(@Valid @RequestBody CreateUserRequest request) {
-        User user = userService.createUser(request);
-        return ResponseEntity.ok(user);
+    public User createUser(@RequestBody CreateUserRequest request) {
+        return userService.createUser(request);
     }
     
-    @GetMapping("/{id}")
-    public ResponseEntity<User> getUser(@PathVariable Integer id) {
-        User user = userService.getUserById(id);
-        return ResponseEntity.ok(user);
+    @GetMapping("/{userId}")
+    public User getUser(@PathVariable Long userId) {
+        return userService.getUserById(userId);
+    }
+
+    @PutMapping("/{userId}")
+    public User updateUser(@PathVariable Long userId, @RequestBody User user) {
+        user.setId(userId);
+        return userService.updateUser(user);
+    }
+
+    @DeleteMapping("/{userId}")
+    public void deleteUser(@PathVariable Long userId) {
+        userService.deleteUser(userId);
     }
 } 

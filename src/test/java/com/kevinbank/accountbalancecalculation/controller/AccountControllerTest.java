@@ -5,99 +5,100 @@ import com.kevinbank.accountbalancecalculation.model.CreateAccountRequest;
 import com.kevinbank.accountbalancecalculation.service.AccountService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.http.ResponseEntity;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.http.MediaType;
+import org.springframework.test.web.servlet.MockMvc;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.math.BigDecimal;
-import java.util.Arrays;
-import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
-import static org.junit.jupiter.api.Assertions.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@ExtendWith(MockitoExtension.class)
+@WebMvcTest(AccountController.class)
 class AccountControllerTest {
 
-    @Mock
+    @Autowired
+    private MockMvc mockMvc;
+
+    @MockBean
     private AccountService accountService;
 
-    @InjectMocks
-    private AccountController accountController;
+    @Autowired
+    private ObjectMapper objectMapper;
 
-    private Account mockAccount;
-    private CreateAccountRequest mockRequest;
+    private Account testAccount;
+    private CreateAccountRequest createRequest;
 
     @BeforeEach
     void setUp() {
-        // 准备测试数据
-        mockAccount = new Account();
-        mockAccount.setId(1L);
-        mockAccount.setUserId(1);
-        mockAccount.setBalance(new BigDecimal("1000.00"));
-        mockAccount.setCreditLimit(new BigDecimal("5000.00"));
-        mockAccount.setAccountNumber("ACC001");
+        testAccount = new Account();
+        testAccount.setId(1L);  // 使用 Long 类型
+        testAccount.setUserId(1L);  // 使用 Long 类型
+        testAccount.setAccountNumber("TEST001");
+        testAccount.setBalance(new BigDecimal("1000.00"));
+        testAccount.setCreditLimit(new BigDecimal("500.00"));
 
-        mockRequest = new CreateAccountRequest();
-        mockRequest.setUserId(1);
-        mockRequest.setCreditLimit(new BigDecimal("5000.00"));
-        mockRequest.setAccountNumber("ACC001");
+        createRequest = new CreateAccountRequest();
+        createRequest.setUserId(1L);  // 使用 Long 类型
+        createRequest.setAccountNumber("TEST001");
+        createRequest.setBalance(new BigDecimal("1000.00"));
+        createRequest.setCreditLimit(new BigDecimal("500.00"));
     }
 
     @Test
-    void createAccount_ShouldReturnAccount() {
-        // 准备
+    void createAccount() throws Exception {
         when(accountService.createAccount(any(CreateAccountRequest.class)))
-                .thenReturn(mockAccount);
+                .thenReturn(testAccount);
 
-        // 执行
-        ResponseEntity<Account> response = accountController.createAccount(mockRequest);
-
-        // 验证
-        assertNotNull(response);
-        assertEquals(200, response.getStatusCodeValue());
-        assertEquals(mockAccount, response.getBody());
+        mockMvc.perform(post("/api/accounts")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(createRequest)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(1L))  // 使用 Long 类型
+                .andExpect(jsonPath("$.userId").value(1L))  // 使用 Long 类型
+                .andExpect(jsonPath("$.accountNumber").value("TEST001"))
+                .andExpect(jsonPath("$.balance").value("1000.00"));
     }
 
     @Test
-    void updateBalance_ShouldReturnNoContent() {
-        // 执行
-        ResponseEntity<Void> response = accountController.updateBalance(1L, new BigDecimal("100.00"));
+    void getAccount() throws Exception {
+        when(accountService.getAccountById(1L))  // 使用 Long 类型
+                .thenReturn(testAccount);
 
-        // 验证
-        assertNotNull(response);
-        assertEquals(200, response.getStatusCodeValue());
+        mockMvc.perform(get("/api/accounts/1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(1L))  // 使用 Long 类型
+                .andExpect(jsonPath("$.userId").value(1L))  // 使用 Long 类型
+                .andExpect(jsonPath("$.accountNumber").value("TEST001"))
+                .andExpect(jsonPath("$.balance").value("1000.00"));
     }
 
     @Test
-    void getAccount_ShouldReturnAccount() {
-        // 准备
-        when(accountService.getAccountById(1L)).thenReturn(mockAccount);
+    void deposit() throws Exception {
+        when(accountService.deposit(1L, new BigDecimal("100.00")))  // 使用 Long 类型
+                .thenReturn(testAccount);
 
-        // 执行
-        ResponseEntity<Account> response = accountController.getAccount(1L);
-
-        // 验证
-        assertNotNull(response);
-        assertEquals(200, response.getStatusCodeValue());
-        assertEquals(mockAccount, response.getBody());
+        mockMvc.perform(post("/api/accounts/1/deposit")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("100.00"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.balance").value("1000.00"));
     }
 
     @Test
-    void getAllAccounts_ShouldReturnAccountList() {
-        // 准备
-        List<Account> mockAccounts = Arrays.asList(mockAccount);
-        when(accountService.getAllAccounts()).thenReturn(mockAccounts);
+    void withdraw() throws Exception {
+        when(accountService.withdraw(1L, new BigDecimal("100.00")))  // 使用 Long 类型
+                .thenReturn(testAccount);
 
-        // 执行
-        ResponseEntity<List<Account>> response = accountController.getAllAccounts();
-
-        // 验证
-        assertNotNull(response);
-        assertEquals(200, response.getStatusCodeValue());
-        assertEquals(mockAccounts, response.getBody());
+        mockMvc.perform(post("/api/accounts/1/withdraw")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("100.00"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.balance").value("1000.00"));
     }
 } 

@@ -5,68 +5,68 @@ import com.kevinbank.accountbalancecalculation.model.CreateUserRequest;
 import com.kevinbank.accountbalancecalculation.service.UserService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.http.ResponseEntity;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.http.MediaType;
+import org.springframework.test.web.servlet.MockMvc;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
-import static org.junit.jupiter.api.Assertions.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@ExtendWith(MockitoExtension.class)
+@WebMvcTest(UserController.class)
 class UserControllerTest {
 
-    @Mock
+    @Autowired
+    private MockMvc mockMvc;
+
+    @MockBean
     private UserService userService;
 
-    @InjectMocks
-    private UserController userController;
+    @Autowired
+    private ObjectMapper objectMapper;
 
-    private User mockUser;
-    private CreateUserRequest mockRequest;
+    private User testUser;
+    private CreateUserRequest createRequest;
 
     @BeforeEach
     void setUp() {
-        // 准备测试数据
-        mockUser = new User();
-        mockUser.setId(1);
-        mockUser.setName("testUser");
-        mockUser.setGender("M");
+        testUser = new User();
+        testUser.setId(1L);  // 使用 Long 类型
+        testUser.setName("testUser");
+        testUser.setPasswordHash("hashedPassword");
+        testUser.setGender("M");
 
-        mockRequest = new CreateUserRequest();
-        mockRequest.setName("testUser");
-        mockRequest.setPassword("password123");
-        mockRequest.setGender("M");
+        createRequest = new CreateUserRequest();
+        createRequest.setName("testUser");
+        createRequest.setPassword("password");
+        createRequest.setGender("M");
     }
 
     @Test
-    void createUser_ShouldReturnUser() {
-        // 准备
+    void createUser() throws Exception {
         when(userService.createUser(any(CreateUserRequest.class)))
-                .thenReturn(mockUser);
+                .thenReturn(testUser);
 
-        // 执行
-        ResponseEntity<User> response = userController.createUser(mockRequest);
-
-        // 验证
-        assertNotNull(response);
-        assertEquals(200, response.getStatusCodeValue());
-        assertEquals(mockUser, response.getBody());
+        mockMvc.perform(post("/api/users")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(createRequest)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(1L))
+                .andExpect(jsonPath("$.name").value("testUser"));
     }
 
     @Test
-    void getUser_ShouldReturnUser() {
-        // 准备
-        when(userService.getUserById(1)).thenReturn(mockUser);
+    void getUser() throws Exception {
+        when(userService.getUserById(1L))
+                .thenReturn(testUser);
 
-        // 执行
-        ResponseEntity<User> response = userController.getUser(1);
-
-        // 验证
-        assertNotNull(response);
-        assertEquals(200, response.getStatusCodeValue());
-        assertEquals(mockUser, response.getBody());
+        mockMvc.perform(get("/api/users/1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(1L))
+                .andExpect(jsonPath("$.name").value("testUser"));
     }
 } 

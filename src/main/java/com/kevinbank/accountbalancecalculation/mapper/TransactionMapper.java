@@ -9,6 +9,8 @@ import org.mapstruct.Mapping;
 public interface TransactionMapper {
     
     @Mapping(target = "id", ignore = true)
-    @Mapping(target = "createdAt", ignore = true)
-    Transaction toTransaction(CreateTransactionRequest createTransactionRequest);
+    @Mapping(target = "transactionTime", expression = "java(java.time.LocalDateTime.now())")
+    Transaction toTransaction(CreateTransactionRequest request);
+    
+    // 如果需要其他映射方法，可以在这里添加
 } 

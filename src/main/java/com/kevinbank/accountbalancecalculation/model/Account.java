@@ -19,16 +19,16 @@ public class Account {
     private Long id;
     
     @Column(name = "user_id", nullable = false)
-    private Integer userId;
+    private Long userId;
+    
+    @Column(unique = true, nullable = false)
+    private String accountNumber;
     
     @Column(nullable = false)
-    private BigDecimal balance;
+    private BigDecimal balance = BigDecimal.ZERO;
     
-    @Column(name = "credit_limit")
-    private BigDecimal creditLimit;
-    
-    @Column(name = "account_number", unique = true, nullable = false)
-    private String accountNumber;
+    @Column(name = "credit_limit", nullable = false)
+    private BigDecimal creditLimit = BigDecimal.ZERO;
     
     @Column(name = "created_at")
     private LocalDateTime createdAt;

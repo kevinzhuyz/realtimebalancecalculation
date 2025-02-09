@@ -2,125 +2,95 @@ package com.kevinbank.accountbalancecalculation.controller;
 
 import com.kevinbank.accountbalancecalculation.model.Transaction;
 import com.kevinbank.accountbalancecalculation.model.CreateTransactionRequest;
+import com.kevinbank.accountbalancecalculation.model.TransactionType;
 import com.kevinbank.accountbalancecalculation.service.TransactionService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.http.ResponseEntity;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.http.MediaType;
+import org.springframework.test.web.servlet.MockMvc;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.Arrays;
-import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
-import static org.junit.jupiter.api.Assertions.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@ExtendWith(MockitoExtension.class)
+@WebMvcTest(TransactionController.class)
 class TransactionControllerTest {
 
-    @Mock
+    @Autowired
+    private MockMvc mockMvc;
+
+    @MockBean
     private TransactionService transactionService;
 
-    @InjectMocks
-    private TransactionController transactionController;
+    @Autowired
+    private ObjectMapper objectMapper;
 
-    private Transaction mockTransaction;
-    private CreateTransactionRequest mockRequest;
+    private Transaction testTransaction;
+    private CreateTransactionRequest createRequest;
 
     @BeforeEach
     void setUp() {
-        // 准备测试数据
-        mockTransaction = new Transaction();
-        mockTransaction.setId(1L);
-        mockTransaction.setAmount(new BigDecimal("100.00"));
-        mockTransaction.setType("TRANSFER");
+        testTransaction = new Transaction();
+        testTransaction.setId(1L);
+        testTransaction.setSourceAccountId(1L);
+        testTransaction.setTargetAccountId(2L);
+        testTransaction.setAmount(new BigDecimal("100.00"));
+        testTransaction.setType(TransactionType.TRANSFER);  // 使用枚举
+        testTransaction.setDescription("测试交易");
+        testTransaction.setTransactionTime(LocalDateTime.now());
 
-        mockRequest = new CreateTransactionRequest();
-        mockRequest.setSourceAccountId(1L);
-        mockRequest.setTargetAccountId(2L);
-        mockRequest.setAmount(new BigDecimal("100.00"));
-        mockRequest.setType("TRANSFER");
+        createRequest = new CreateTransactionRequest();
+        createRequest.setSourceAccountId(1L);
+        createRequest.setTargetAccountId(2L);
+        createRequest.setAmount(new BigDecimal("100.00"));
+        createRequest.setType(TransactionType.TRANSFER);  // 使用枚举
+        createRequest.setDescription("测试交易");
     }
 
     @Test
-    void transfer_ShouldReturnTransaction() {
-        // 准备
+    void createTransaction() throws Exception {
         when(transactionService.createTransaction(any(CreateTransactionRequest.class)))
-                .thenReturn(mockTransaction);
+                .thenReturn(testTransaction);
 
-        // 执行
-        ResponseEntity<Transaction> response = transactionController.transfer(
-                mockRequest.getSourceAccountId(),
-                mockRequest.getTargetAccountId(),
-                mockRequest.getAmount()
-        );
-
-        // 验证
-        assertNotNull(response);
-        assertEquals(200, response.getStatusCodeValue());
-        assertEquals(mockTransaction, response.getBody());
+        mockMvc.perform(post("/api/transactions")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(createRequest)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(1L))
+                .andExpect(jsonPath("$.sourceAccountId").value(1L))
+                .andExpect(jsonPath("$.targetAccountId").value(2L))
+                .andExpect(jsonPath("$.amount").value("100.00"))
+                .andExpect(jsonPath("$.type").value(TransactionType.TRANSFER.name()));  // 使用枚举名称
     }
 
     @Test
-    void createTransaction_ShouldReturnTransaction() {
-        // 准备
-        when(transactionService.createTransaction(any(CreateTransactionRequest.class)))
-                .thenReturn(mockTransaction);
+    void getTransactionsByAccount() throws Exception {
+        when(transactionService.getTransactionsByAccountId(1L))
+                .thenReturn(Arrays.asList(testTransaction));
 
-        // 执行
-        ResponseEntity<Transaction> response = transactionController.createTransaction(mockRequest);
-
-        // 验证
-        assertNotNull(response);
-        assertEquals(200, response.getStatusCodeValue());
-        assertEquals(mockTransaction, response.getBody());
+        mockMvc.perform(get("/api/transactions/account/1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value(1L))
+                .andExpect(jsonPath("$[0].type").value(TransactionType.TRANSFER.name()));  // 使用枚举名称
     }
 
     @Test
-    void getTransactionsByAccountId_ShouldReturnTransactionList() {
-        // 准备
-        List<Transaction> mockTransactions = Arrays.asList(mockTransaction);
-        when(transactionService.getTransactionsByAccountId(1L)).thenReturn(mockTransactions);
+    void getTransaction() throws Exception {
+        when(transactionService.getTransactionById(1L))
+                .thenReturn(testTransaction);
 
-        // 执行
-        ResponseEntity<List<Transaction>> response = transactionController.getTransactionsByAccountId(1L);
-
-        // 验证
-        assertNotNull(response);
-        assertEquals(200, response.getStatusCodeValue());
-        assertEquals(mockTransactions, response.getBody());
-    }
-
-    @Test
-    void getTransaction_ShouldReturnTransaction() {
-        // 准备
-        when(transactionService.getTransactionById(1L)).thenReturn(mockTransaction);
-
-        // 执行
-        ResponseEntity<Transaction> response = transactionController.getTransaction(1L);
-
-        // 验证
-        assertNotNull(response);
-        assertEquals(200, response.getStatusCodeValue());
-        assertEquals(mockTransaction, response.getBody());
-    }
-
-    @Test
-    void getAllTransactions_ShouldReturnTransactionList() {
-        // 准备
-        List<Transaction> mockTransactions = Arrays.asList(mockTransaction);
-        when(transactionService.getAllTransactions()).thenReturn(mockTransactions);
-
-        // 执行
-        ResponseEntity<List<Transaction>> response = transactionController.getAllTransactions();
-
-        // 验证
-        assertNotNull(response);
-        assertEquals(200, response.getStatusCodeValue());
-        assertEquals(mockTransactions, response.getBody());
+        mockMvc.perform(get("/api/transactions/1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(1L))
+                .andExpect(jsonPath("$.type").value(TransactionType.TRANSFER.name()));  // 使用枚举名称
     }
 } 

@@ -13,9 +13,6 @@ public class Transaction {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
     
-    @Column(nullable = false)
-    private String type;  // DEPOSIT, WITHDRAW, TRANSFER
-    
     @Column(name = "source_account_id")
     private Long sourceAccountId;
     
@@ -25,11 +22,19 @@ public class Transaction {
     @Column(nullable = false)
     private BigDecimal amount;
     
-    @Column(name = "created_at")
-    private LocalDateTime createdAt;
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private TransactionType type;
+    
+    private String description;
+    
+    @Column(name = "transaction_time", nullable = false)
+    private LocalDateTime transactionTime;
     
     @PrePersist
     protected void onCreate() {
-        createdAt = LocalDateTime.now();
+        if (transactionTime == null) {
+            transactionTime = LocalDateTime.now();
+        }
     }
 } 

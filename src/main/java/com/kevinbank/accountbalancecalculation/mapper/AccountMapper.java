@@ -12,7 +12,7 @@ import java.util.List;
 public interface AccountMapper {
     
     @Mapping(target = "id", ignore = true)
-    @Mapping(target = "balance", constant = "0")
     @Mapping(target = "createdAt", ignore = true)
-    Account toAccount(CreateAccountRequest createAccountRequest);
+    @Mapping(target = "balance", source = "balance", defaultValue = "0")
+    Account toAccount(CreateAccountRequest request);
 } 

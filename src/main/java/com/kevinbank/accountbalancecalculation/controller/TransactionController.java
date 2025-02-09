@@ -2,6 +2,7 @@ package com.kevinbank.accountbalancecalculation.controller;
 
 import com.kevinbank.accountbalancecalculation.model.Transaction;
 import com.kevinbank.accountbalancecalculation.model.CreateTransactionRequest;
+import com.kevinbank.accountbalancecalculation.model.TransactionType;
 import com.kevinbank.accountbalancecalculation.service.TransactionService;
 import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
@@ -32,7 +33,8 @@ public class TransactionController {
         request.setSourceAccountId(sourceAccountId);
         request.setTargetAccountId(targetAccountId);
         request.setAmount(amount);
-        request.setType("TRANSFER");
+        request.setType(TransactionType.TRANSFER);
+        request.setDescription("转账交易");
         
         try {
             Transaction transaction = transactionService.createTransaction(request);
@@ -44,21 +46,14 @@ public class TransactionController {
     }
     
     @PostMapping
-    public ResponseEntity<Transaction> createTransaction(
-            @Valid @RequestBody CreateTransactionRequest request) {
-        log.info("创建交易请求 - 类型: {}, 金额: {}", request.getType(), request.getAmount());
-        try {
-            Transaction transaction = transactionService.createTransaction(request);
-            return ResponseEntity.ok(transaction);
-        } catch (Exception e) {
-            log.error("创建交易失败", e);
-            throw e;
-        }
+    public ResponseEntity<Transaction> createTransaction(@Valid @RequestBody CreateTransactionRequest request) {
+        log.info("Creating transaction: {}", request);
+        Transaction transaction = transactionService.createTransaction(request);
+        return ResponseEntity.ok(transaction);
     }
     
     @GetMapping("/account/{accountId}")
-    public ResponseEntity<List<Transaction>> getTransactionsByAccountId(
-            @PathVariable Long accountId) {
+    public ResponseEntity<List<Transaction>> getTransactionsByAccount(@PathVariable Long accountId) {
         List<Transaction> transactions = transactionService.getTransactionsByAccountId(accountId);
         return ResponseEntity.ok(transactions);
     }

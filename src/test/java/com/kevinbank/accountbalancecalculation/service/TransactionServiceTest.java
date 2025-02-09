@@ -3,6 +3,7 @@ package com.kevinbank.accountbalancecalculation.service;
 import com.kevinbank.accountbalancecalculation.model.Account;
 import com.kevinbank.accountbalancecalculation.model.Transaction;
 import com.kevinbank.accountbalancecalculation.model.CreateTransactionRequest;
+import com.kevinbank.accountbalancecalculation.model.TransactionType;
 import com.kevinbank.accountbalancecalculation.mapper.TransactionMapper;
 import com.kevinbank.accountbalancecalculation.repository.TransactionRepository;
 import com.kevinbank.accountbalancecalculation.repository.AccountRepository;
@@ -13,13 +14,17 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.ValueOperations;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 import static org.junit.jupiter.api.Assertions.*;
@@ -36,6 +41,15 @@ class TransactionServiceTest {
     @Mock
     private TransactionMapper transactionMapper;
 
+    @Mock
+    private RedisTemplate<String, Object> redisTemplate;
+
+    @Mock
+    private CacheService cacheService;
+
+    @Mock
+    private ValueOperations<String, Object> valueOperations;
+
     @InjectMocks
     private TransactionServiceImpl transactionService;
 
@@ -46,13 +60,22 @@ class TransactionServiceTest {
 
     @BeforeEach
     void setUp() {
+        // 设置 RedisTemplate mock
+        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
+        when(valueOperations.setIfAbsent(anyString(), anyString(), anyLong(), any())).thenReturn(true);
+
+        // 设置 CacheService mock
+        when(cacheService.get(anyString(), any())).thenReturn(null);
+
         // 准备交易数据
         mockTransaction = new Transaction();
         mockTransaction.setId(1L);
         mockTransaction.setSourceAccountId(1L);
         mockTransaction.setTargetAccountId(2L);
         mockTransaction.setAmount(new BigDecimal("100.00"));
-        mockTransaction.setType("TRANSFER");
+        mockTransaction.setType(TransactionType.TRANSFER);
+        mockTransaction.setDescription("测试交易");
+        mockTransaction.setTransactionTime(LocalDateTime.now());
 
         // 准备账户数据
         mockSourceAccount = new Account();
@@ -68,31 +91,26 @@ class TransactionServiceTest {
         mockRequest.setSourceAccountId(1L);
         mockRequest.setTargetAccountId(2L);
         mockRequest.setAmount(new BigDecimal("100.00"));
-        mockRequest.setType("TRANSFER");
+        mockRequest.setType(TransactionType.TRANSFER);
+        mockRequest.setDescription("测试交易");
     }
 
     @Test
     void createTransaction_TransferSuccess() {
         // 准备
-        when(accountRepository.findById(1L)).thenReturn(Optional.of(mockSourceAccount));
-        when(accountRepository.findById(2L)).thenReturn(Optional.of(mockTargetAccount));
-        
-        // 设置执行用的 mock
         when(accountRepository.findByIdWithLock(1L)).thenReturn(Optional.of(mockSourceAccount));
         when(accountRepository.findByIdWithLock(2L)).thenReturn(Optional.of(mockTargetAccount));
-        when(transactionMapper.toTransaction(any(CreateTransactionRequest.class))).thenReturn(mockTransaction);
-        when(accountRepository.save(any(Account.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        when(transactionRepository.save(any(Transaction.class))).thenReturn(mockTransaction);
+        when(transactionMapper.toTransaction(any())).thenReturn(mockTransaction);
+        when(accountRepository.save(any())).thenAnswer(i -> i.getArgument(0));
+        when(transactionRepository.save(any())).thenReturn(mockTransaction);
 
         // 执行
         Transaction result = transactionService.createTransaction(mockRequest);
 
         // 验证
         assertNotNull(result);
-        assertEquals(mockTransaction.getId(), result.getId());
-        verify(accountRepository, times(2)).save(any(Account.class));
-        
-        // 验证余额变化
+        assertEquals(TransactionType.TRANSFER, result.getType());
+        verify(accountRepository, times(2)).save(any());
         assertEquals(new BigDecimal("900.00"), mockSourceAccount.getBalance());
         assertEquals(new BigDecimal("600.00"), mockTargetAccount.getBalance());
     }
@@ -100,32 +118,31 @@ class TransactionServiceTest {
     @Test
     void createTransaction_SourceAccountNotFound() {
         // 准备
-        when(accountRepository.findById(1L)).thenReturn(Optional.empty());
+        when(accountRepository.findByIdWithLock(1L)).thenReturn(Optional.empty());
 
         // 执行和验证
         assertThrows(RuntimeException.class, () -> transactionService.createTransaction(mockRequest));
         verify(transactionRepository, never()).save(any(Transaction.class));
-        verify(accountRepository, never()).findByIdWithLock(any());
         verify(accountRepository, never()).save(any());
     }
 
     @Test
     void createTransaction_TargetAccountNotFound() {
         // 准备
-        when(accountRepository.findById(1L)).thenReturn(Optional.of(mockSourceAccount));
-        when(accountRepository.findById(2L)).thenReturn(Optional.empty());
+        when(accountRepository.findByIdWithLock(1L)).thenReturn(Optional.of(mockSourceAccount));
+        when(accountRepository.findByIdWithLock(2L)).thenReturn(Optional.empty());
 
         // 执行和验证
         assertThrows(RuntimeException.class, () -> transactionService.createTransaction(mockRequest));
         verify(transactionRepository, never()).save(any(Transaction.class));
+        verify(accountRepository, never()).save(any());
     }
 
     @Test
     void getTransactionsByAccountId_Success() {
         // 准备
-        List<Transaction> mockTransactions = Arrays.asList(mockTransaction);
         when(transactionRepository.findBySourceAccountIdOrTargetAccountId(1L, 1L))
-                .thenReturn(mockTransactions);
+                .thenReturn(Arrays.asList(mockTransaction));
 
         // 执行
         List<Transaction> results = transactionService.getTransactionsByAccountId(1L);
@@ -133,7 +150,7 @@ class TransactionServiceTest {
         // 验证
         assertNotNull(results);
         assertEquals(1, results.size());
-        assertEquals(mockTransaction.getId(), results.get(0).getId());
+        assertEquals(TransactionType.TRANSFER, results.get(0).getType());
     }
 
     @Test
@@ -146,7 +163,7 @@ class TransactionServiceTest {
 
         // 验证
         assertNotNull(result);
-        assertEquals(mockTransaction.getId(), result.getId());
+        assertEquals(TransactionType.TRANSFER, result.getType());
     }
 
     @Test

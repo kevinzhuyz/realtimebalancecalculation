@@ -1,0 +1,4 @@
+-- 修改 accounts 表的 ID 字段类型
+ALTER TABLE accounts 
+MODIFY COLUMN id BIGINT AUTO_INCREMENT,
+MODIFY COLUMN user_id BIGINT NOT NULL; 

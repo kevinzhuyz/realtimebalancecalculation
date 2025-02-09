@@ -3,15 +3,20 @@ package com.kevinbank.accountbalancecalculation.service.impl;
 import com.kevinbank.accountbalancecalculation.model.Account;
 import com.kevinbank.accountbalancecalculation.model.Transaction;
 import com.kevinbank.accountbalancecalculation.model.CreateTransactionRequest;
+import com.kevinbank.accountbalancecalculation.model.TransactionType;
 import com.kevinbank.accountbalancecalculation.mapper.TransactionMapper;
 import com.kevinbank.accountbalancecalculation.repository.TransactionRepository;
 import com.kevinbank.accountbalancecalculation.repository.AccountRepository;
+import com.kevinbank.accountbalancecalculation.service.TransactionService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.util.Arrays;
@@ -23,142 +28,112 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 import static org.junit.jupiter.api.Assertions.*;
 
-@ExtendWith(MockitoExtension.class)
+@SpringBootTest
+@Transactional
 class TransactionServiceImplTest {
 
-    @Mock
-    private TransactionRepository transactionRepository;
+    @Autowired
+    private TransactionService transactionService;
 
-    @Mock
+    @Autowired
     private AccountRepository accountRepository;
 
-    @Mock
-    private TransactionMapper transactionMapper;
-
-    @InjectMocks
-    private TransactionServiceImpl transactionService;
-
-    private Transaction mockTransaction;
-    private Account mockSourceAccount;
-    private Account mockTargetAccount;
-    private CreateTransactionRequest mockRequest;
+    private Account testSourceAccount;
+    private Account testTargetAccount;
 
     @BeforeEach
     void setUp() {
-        // 初始化 mock 账户
-        mockSourceAccount = new Account();
-        mockSourceAccount.setId(1L);
-        mockSourceAccount.setBalance(new BigDecimal("1000.00"));
+        testSourceAccount = new Account();
+        testSourceAccount.setUserId(1L);  // 使用 Long 类型
+        testSourceAccount.setAccountNumber("TEST001");
+        testSourceAccount.setBalance(new BigDecimal("1000.00"));
+        testSourceAccount.setCreditLimit(new BigDecimal("500.00"));
+        testSourceAccount = accountRepository.save(testSourceAccount);
 
-        mockTargetAccount = new Account();
-        mockTargetAccount.setId(2L);
-        mockTargetAccount.setBalance(new BigDecimal("500.00"));
-
-        // 初始化 mock 交易
-        mockTransaction = new Transaction();
-        mockTransaction.setId(1L);
-        mockTransaction.setSourceAccountId(1L);
-        mockTransaction.setTargetAccountId(2L);
-        mockTransaction.setAmount(new BigDecimal("100.00"));
-        mockTransaction.setType("TRANSFER");
-
-        // 初始化 mock 请求
-        mockRequest = new CreateTransactionRequest();
-        mockRequest.setSourceAccountId(1L);
-        mockRequest.setTargetAccountId(2L);
-        mockRequest.setAmount(new BigDecimal("100.00"));
-        mockRequest.setType("TRANSFER");
+        testTargetAccount = new Account();
+        testTargetAccount.setUserId(2L);  // 使用 Long 类型
+        testTargetAccount.setAccountNumber("TEST002");
+        testTargetAccount.setBalance(new BigDecimal("500.00"));
+        testTargetAccount.setCreditLimit(new BigDecimal("500.00"));
+        testTargetAccount = accountRepository.save(testTargetAccount);
     }
 
     @Test
-    void createTransaction_TransferSuccess() {
-        // 准备
-        // 设置验证用的 mock
-        when(accountRepository.findById(1L)).thenReturn(Optional.of(mockSourceAccount));
-        when(accountRepository.findById(2L)).thenReturn(Optional.of(mockTargetAccount));
+    void testTransfer() {
+        CreateTransactionRequest request = new CreateTransactionRequest();
+        request.setSourceAccountId(testSourceAccount.getId());
+        request.setTargetAccountId(testTargetAccount.getId());
+        request.setAmount(new BigDecimal("100.00"));
+        request.setType(TransactionType.TRANSFER);
+        request.setDescription("转账测试");
         
-        // 设置执行用的 mock
-        when(accountRepository.findByIdWithLock(1L)).thenReturn(Optional.of(mockSourceAccount));
-        when(accountRepository.findByIdWithLock(2L)).thenReturn(Optional.of(mockTargetAccount));
-        when(transactionMapper.toTransaction(any(CreateTransactionRequest.class))).thenReturn(mockTransaction);
-        when(accountRepository.save(any(Account.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        when(transactionRepository.save(any(Transaction.class))).thenReturn(mockTransaction);
-
-        // 执行
-        Transaction result = transactionService.createTransaction(mockRequest);
-
-        // 验证
-        assertNotNull(result);
-        assertEquals(mockTransaction.getId(), result.getId());
-        verify(accountRepository, times(2)).save(any(Account.class));
+        Transaction transaction = transactionService.createTransaction(request);
         
-        // 验证余额变化
-        assertEquals(new BigDecimal("900.00"), mockSourceAccount.getBalance());
-        assertEquals(new BigDecimal("600.00"), mockTargetAccount.getBalance());
+        assertNotNull(transaction);
+        assertEquals(TransactionType.TRANSFER, transaction.getType());
+        assertEquals(new BigDecimal("100.00"), transaction.getAmount());
+        assertEquals(testSourceAccount.getId(), transaction.getSourceAccountId());
+        assertEquals(testTargetAccount.getId(), transaction.getTargetAccountId());
+        
+        // 验证账户余额变化
+        Account updatedSourceAccount = accountRepository.findById(testSourceAccount.getId()).get();
+        Account updatedTargetAccount = accountRepository.findById(testTargetAccount.getId()).get();
+        assertEquals(new BigDecimal("900.00"), updatedSourceAccount.getBalance());
+        assertEquals(new BigDecimal("600.00"), updatedTargetAccount.getBalance());
     }
 
     @Test
-    void createTransaction_SourceAccountNotFound() {
-        // 准备
-        when(accountRepository.findById(1L)).thenReturn(Optional.empty());
-
-        // 执行和验证
-        assertThrows(RuntimeException.class, () -> transactionService.createTransaction(mockRequest));
-        verify(transactionRepository, never()).save(any(Transaction.class));
-        verify(accountRepository, never()).findByIdWithLock(any());
-        verify(accountRepository, never()).save(any());
+    void testDeposit() {
+        CreateTransactionRequest request = new CreateTransactionRequest();
+        request.setTargetAccountId(testSourceAccount.getId());
+        request.setAmount(new BigDecimal("100.00"));
+        request.setType(TransactionType.DEPOSIT);
+        request.setDescription("存款测试");
+        
+        Transaction transaction = transactionService.createTransaction(request);
+        
+        assertNotNull(transaction);
+        assertEquals(TransactionType.DEPOSIT, transaction.getType());
+        assertEquals(new BigDecimal("100.00"), transaction.getAmount());
+        
+        // 验证账户余额增加
+        Account updatedAccount = accountRepository.findById(testSourceAccount.getId()).get();
+        assertEquals(new BigDecimal("1100.00"), updatedAccount.getBalance());
     }
 
     @Test
-    void getTransactionsByAccountId_Success() {
-        // 准备
-        List<Transaction> mockTransactions = Arrays.asList(mockTransaction);
-        when(transactionRepository.findBySourceAccountIdOrTargetAccountId(1L, 1L))
-                .thenReturn(mockTransactions);
-
-        // 执行
-        List<Transaction> results = transactionService.getTransactionsByAccountId(1L);
-
-        // 验证
-        assertNotNull(results);
-        assertEquals(1, results.size());
-        assertEquals(mockTransaction.getId(), results.get(0).getId());
+    void testWithdraw() {
+        CreateTransactionRequest request = new CreateTransactionRequest();
+        request.setSourceAccountId(testSourceAccount.getId());
+        request.setAmount(new BigDecimal("100.00"));
+        request.setType(TransactionType.WITHDRAW);
+        request.setDescription("取款测试");
+        
+        Transaction transaction = transactionService.createTransaction(request);
+        
+        assertNotNull(transaction);
+        assertEquals(TransactionType.WITHDRAW, transaction.getType());
+        assertEquals(new BigDecimal("100.00"), transaction.getAmount());
+        
+        // 验证账户余额减少
+        Account updatedAccount = accountRepository.findById(testSourceAccount.getId()).get();
+        assertEquals(new BigDecimal("900.00"), updatedAccount.getBalance());
     }
 
     @Test
-    void getTransactionById_Success() {
-        // 准备
-        when(transactionRepository.findById(1L)).thenReturn(Optional.of(mockTransaction));
-
-        // 执行
-        Transaction result = transactionService.getTransactionById(1L);
-
-        // 验证
-        assertNotNull(result);
-        assertEquals(mockTransaction.getId(), result.getId());
-    }
-
-    @Test
-    void getTransactionById_NotFound() {
-        // 准备
-        when(transactionRepository.findById(1L)).thenReturn(Optional.empty());
-
-        // 执行和验证
-        assertThrows(RuntimeException.class, () -> transactionService.getTransactionById(1L));
-    }
-
-    @Test
-    void getAllTransactions_Success() {
-        // 准备
-        List<Transaction> mockTransactions = Arrays.asList(mockTransaction);
-        when(transactionRepository.findAll()).thenReturn(mockTransactions);
-
-        // 执行
-        List<Transaction> results = transactionService.getAllTransactions();
-
-        // 验证
-        assertNotNull(results);
-        assertEquals(1, results.size());
-        assertEquals(mockTransaction.getId(), results.get(0).getId());
+    void testWithdrawInsufficientFunds() {
+        CreateTransactionRequest request = new CreateTransactionRequest();
+        request.setSourceAccountId(testSourceAccount.getId());
+        request.setAmount(new BigDecimal("2000.00"));  // 超过余额和信用额度
+        request.setType(TransactionType.WITHDRAW);
+        request.setDescription("取款测试-余额不足");
+        
+        assertThrows(RuntimeException.class, () -> {
+            transactionService.createTransaction(request);
+        });
+        
+        // 验证账户余额未变
+        Account updatedAccount = accountRepository.findById(testSourceAccount.getId()).get();
+        assertEquals(new BigDecimal("1000.00"), updatedAccount.getBalance());
     }
 } 
