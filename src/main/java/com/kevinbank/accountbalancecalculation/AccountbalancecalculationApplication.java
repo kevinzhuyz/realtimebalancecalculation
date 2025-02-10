@@ -9,7 +9,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
  */
 @SpringBootApplication
 public class AccountbalancecalculationApplication {
-    
+
     /**
      * 应用程序的入口方法。
      * @param args 命令行参数
@@ -18,5 +18,3 @@ public class AccountbalancecalculationApplication {
         SpringApplication.run(AccountbalancecalculationApplication.class, args);
     }
 }
-
-
