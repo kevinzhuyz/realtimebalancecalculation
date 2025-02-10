@@ -6,7 +6,7 @@
 - 数据库: 0
 - 用户名: kevin
 
-## 2. 测试步骤和结果
+## 2. 测试步骤及结果
 
 ### 2.1 Redis 连接测试 (testRedisConnection)
 
