@@ -3,6 +3,9 @@ package com.kevinbank.accountbalancecalculation.service;
 import com.kevinbank.accountbalancecalculation.model.User;
 import com.kevinbank.accountbalancecalculation.model.CreateUserRequest;
 
+/**
+ * 用户服务接口，提供用户相关的操作
+ */
 public interface UserService {
     /**
      * 根据用户ID获取用户信息
