@@ -14,25 +14,47 @@ import java.time.LocalDateTime;
 @Entity
 @Table(name = "accounts")
 public class Account {
+    /**
+     * 主键，唯一标识一个账户记录。
+     */
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-    
+
+    /**
+     * 用户ID，关联到用户信息。
+     */
     @Column(name = "user_id", nullable = false)
     private Long userId;
-    
+
+    /**
+     * 账户号码，每个账户的唯一标识。
+     */
     @Column(unique = true, nullable = false)
     private String accountNumber;
-    
+
+    /**
+     * 账户余额，默认为0。
+     */
     @Column(nullable = false)
     private BigDecimal balance = BigDecimal.ZERO;
-    
+
+    /**
+     * 信用额度，默认为0。
+     */
     @Column(name = "credit_limit", nullable = false)
     private BigDecimal creditLimit = BigDecimal.ZERO;
-    
+
+    /**
+     * 账户创建时间。
+     */
     @Column(name = "created_at")
     private LocalDateTime createdAt;
-    
+
+    /**
+     * 在持久化实体之前自动设置创建时间。
+     * 这个方法由 JPA 调用，用于在实体被持久化到数据库之前设置创建时间。
+     */
     @PrePersist
     protected void onCreate() {
         createdAt = LocalDateTime.now();
