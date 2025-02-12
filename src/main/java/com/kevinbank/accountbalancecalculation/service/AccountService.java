@@ -72,4 +72,12 @@ public interface AccountService {
      * @param amount 转账金额
      */
     void transfer(Long sourceAccountId, Long targetAccountId, BigDecimal amount);
+
+    /**
+     * 更新账户信息
+     *
+     * @param account 需要更新的账户对象
+     * @return 返回更新后的Account对象
+     */
+    Account updateAccount(Account account);
 }

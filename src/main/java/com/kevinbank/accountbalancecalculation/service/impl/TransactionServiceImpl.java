@@ -47,6 +47,8 @@ public class TransactionServiceImpl implements TransactionService {
 
     private static final String TRANSACTION_LIST_KEY = "transactions:account:";
     private static final String LOCK_KEY_PREFIX = "lock:transaction:";
+    private static final String TRANSACTION_CACHE_KEY_PREFIX = "transaction:";
+    private static final long CACHE_TIMEOUT = 30; // 缓存30分钟
 
     /**
      * 创建交易记录
@@ -135,6 +137,22 @@ public class TransactionServiceImpl implements TransactionService {
                 Transaction savedTransaction = transactionRepository.findById(transaction.getId())
                         .orElseThrow(() -> new RuntimeException("无法获取已保存的交易记录"));
                 log.info("交易记录已确认保存: {}", savedTransaction);
+
+                // 保存到缓存
+                String cacheKey = TRANSACTION_CACHE_KEY_PREFIX + savedTransaction.getId();
+                log.info("Attempting to cache transaction with key: {}", cacheKey);
+                try {
+                    cacheService.set(cacheKey, savedTransaction, CACHE_TIMEOUT, TimeUnit.MINUTES);
+                    // 验证缓存是否成功
+                    Transaction cachedTransaction = cacheService.get(cacheKey, Transaction.class);
+                    if (cachedTransaction != null) {
+                        log.info("Successfully verified cache write for key: {}", cacheKey);
+                    } else {
+                        log.warn("Cache verification failed for key: {}", cacheKey);
+                    }
+                } catch (Exception e) {
+                    log.error("Failed to cache transaction: {}", e.getMessage(), e);
+                }
 
                 return savedTransaction;
             } catch (Exception e) {
@@ -225,8 +243,22 @@ public class TransactionServiceImpl implements TransactionService {
      */
     @Override
     public Transaction getTransactionById(Long id) {
-        return transactionRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("交易记录不存在"));
+        String cacheKey = TRANSACTION_CACHE_KEY_PREFIX + id;
+        // 先从缓存获取
+        Transaction transaction = cacheService.get(cacheKey, Transaction.class);
+        if (transaction != null) {
+            log.info("Transaction found in cache: {}", cacheKey);
+            return transaction;
+        }
+        
+        // 缓存未命中，从数据库获取
+        log.info("Transaction not found in cache, fetching from database: {}", id);
+        transaction = transactionRepository.findById(id)
+            .orElseThrow(() -> new RuntimeException("Transaction not found: " + id));
+            
+        // 放入缓存
+        cacheService.set(cacheKey, transaction, CACHE_TIMEOUT, TimeUnit.MINUTES);
+        return transaction;
     }
 
     /**

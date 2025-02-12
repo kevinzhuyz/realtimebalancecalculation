@@ -10,6 +10,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com.kevinbank.accountbalancecalculation.service.CacheService;
+import java.util.concurrent.TimeUnit;
 
 /**
  * 用户服务实现类
@@ -26,6 +28,12 @@ public class UserServiceImpl implements UserService {
 
     @Autowired
     private PasswordEncoder passwordEncoder;
+
+    @Autowired
+    private CacheService cacheService;
+
+    private static final String USER_CACHE_KEY_PREFIX = "user:";
+    private static final long CACHE_TIMEOUT = 30; // 缓存30分钟
 
     /**
      * 创建新用户
@@ -50,7 +58,11 @@ public class UserServiceImpl implements UserService {
 
         try {
             // 保存用户
-            return userRepository.save(user);
+            User savedUser = userRepository.save(user);
+            // 保存到缓存
+            String cacheKey = USER_CACHE_KEY_PREFIX + savedUser.getId();
+            cacheService.set(cacheKey, savedUser, CACHE_TIMEOUT, TimeUnit.MINUTES);
+            return savedUser;
         } catch (Exception e) {
             log.error("创建用户失败", e);
             throw new RuntimeException("创建用户失败");
@@ -66,8 +78,23 @@ public class UserServiceImpl implements UserService {
      */
     @Override
     public User getUserById(Long userId) {
-        return userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("用户不存在"));
+        String cacheKey = USER_CACHE_KEY_PREFIX + userId;
+        
+        // 先从缓存获取
+        User user = cacheService.get(cacheKey, User.class);
+        if (user != null) {
+            log.info("User found in cache: {}", cacheKey);
+            return user;
+        }
+        
+        // 缓存未命中，从数据库获取
+        log.info("User not found in cache, fetching from database: {}", userId);
+        user = userRepository.findById(userId)
+            .orElseThrow(() -> new RuntimeException("User not found: " + userId));
+            
+        // 放入缓存
+        cacheService.set(cacheKey, user, CACHE_TIMEOUT, TimeUnit.MINUTES);
+        return user;
     }
 
     /**
@@ -78,11 +105,16 @@ public class UserServiceImpl implements UserService {
      * @throws RuntimeException 如果用户不存在，则抛出运行时异常
      */
     @Override
+    @Transactional
     public User updateUser(User user) {
         if (!userRepository.existsById(user.getId())) {
             throw new RuntimeException("用户不存在");
         }
-        return userRepository.save(user);
+        User updatedUser = userRepository.save(user);
+        // 更新缓存
+        String cacheKey = USER_CACHE_KEY_PREFIX + updatedUser.getId();
+        cacheService.set(cacheKey, updatedUser, CACHE_TIMEOUT, TimeUnit.MINUTES);
+        return updatedUser;
     }
 
     /**

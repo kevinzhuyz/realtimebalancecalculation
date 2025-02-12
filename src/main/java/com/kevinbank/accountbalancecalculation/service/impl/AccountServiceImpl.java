@@ -51,8 +51,8 @@ public class AccountServiceImpl implements AccountService {
     @Autowired
     private BalanceService balanceService;
 
-    private static final String ACCOUNT_CACHE_KEY = "account:";
-    private static final long CACHE_DURATION = 5; // 缓存时间（分钟）
+    private static final String ACCOUNT_CACHE_KEY_PREFIX = "account:";
+    private static final long CACHE_TIMEOUT = 30; // 缓存30分钟
 
     /**
      * 系统初始化时加载所有账户信息到缓存。
@@ -62,8 +62,8 @@ public class AccountServiceImpl implements AccountService {
     public void init() {
         List<Account> accounts = accountRepository.findAll();
         for (Account account : accounts) {
-            String cacheKey = ACCOUNT_CACHE_KEY + account.getId();
-            cacheService.set(cacheKey, account, CACHE_DURATION, TimeUnit.MINUTES);
+            String cacheKey = ACCOUNT_CACHE_KEY_PREFIX + account.getId();
+            cacheService.set(cacheKey, account, CACHE_TIMEOUT, TimeUnit.MINUTES);
         }
     }
 
@@ -100,6 +100,10 @@ public class AccountServiceImpl implements AccountService {
                 transactionService.createTransaction(transactionRequest);
             }
 
+            // 保存到缓存
+            String cacheKey = ACCOUNT_CACHE_KEY_PREFIX + account.getId();
+            cacheService.set(cacheKey, account, CACHE_TIMEOUT, TimeUnit.MINUTES);
+
             return account;
         } catch (Exception e) {
             log.error("创建账户失败", e);
@@ -123,28 +127,28 @@ public class AccountServiceImpl implements AccountService {
      * 根据账户ID获取账户信息。
      * 首先尝试从缓存中获取，如果缓存未命中，则从数据库中查询。
      *
-     * @param accountId 账户ID。
+     * @param id 账户ID。
      * @return 返回账户对象。
      * @throws RuntimeException 如果账户不存在，则抛出运行时异常。
      */
     @Override
-    public Account getAccountById(Long accountId) {
-        String cacheKey = ACCOUNT_CACHE_KEY + accountId;
-
+    public Account getAccountById(Long id) {
+        String cacheKey = ACCOUNT_CACHE_KEY_PREFIX + id;
+        
+        // 先从缓存获取
         Account account = cacheService.get(cacheKey, Account.class);
         if (account != null) {
+            log.info("Account found in cache: {}", cacheKey);
             return account;
         }
-
-        Optional<Account> optionalAccount = accountRepository.findById(accountId);
-        if (!optionalAccount.isPresent()) {
-            cacheService.set(cacheKey, new Account(), 5, TimeUnit.MINUTES);
-            throw new RuntimeException("账户不存在");
-        }
-
-        account = optionalAccount.get();
-        cacheService.set(cacheKey, account, CACHE_DURATION, TimeUnit.MINUTES);
-
+        
+        // 缓存未命中，从数据库获取
+        log.info("Account not found in cache, fetching from database: {}", id);
+        account = accountRepository.findById(id)
+            .orElseThrow(() -> new RuntimeException("Account not found: " + id));
+            
+        // 放入缓存
+        cacheService.set(cacheKey, account, CACHE_TIMEOUT, TimeUnit.MINUTES);
         return account;
     }
 
@@ -281,5 +285,15 @@ public class AccountServiceImpl implements AccountService {
             log.error("转账失败: {}", e.getMessage(), e);
             throw new RuntimeException("转账失败: " + e.getMessage());
         }
+    }
+
+    @Override
+    @Transactional
+    public Account updateAccount(Account account) {
+        Account updatedAccount = accountRepository.save(account);
+        // 更新缓存
+        String cacheKey = ACCOUNT_CACHE_KEY_PREFIX + updatedAccount.getId();
+        cacheService.set(cacheKey, updatedAccount, CACHE_TIMEOUT, TimeUnit.MINUTES);
+        return updatedAccount;
     }
 }

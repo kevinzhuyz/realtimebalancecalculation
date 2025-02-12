@@ -3,6 +3,7 @@ package com.kevinbank.accountbalancecalculation.model;
 import jakarta.persistence.*;
 import lombok.Data;
 import java.time.LocalDateTime;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 
 /**
  * 用户实体类，用于在数据库中存储用户信息
@@ -12,6 +13,7 @@ import java.time.LocalDateTime;
 @Data
 @Entity
 @Table(name = "users")
+@JsonSerialize
 public class User {
     /**
      * 用户ID，主键，由数据库自动生成
@@ -19,6 +21,7 @@ public class User {
      */
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @JsonSerialize
     private Long id;
 
     /**
@@ -26,6 +29,7 @@ public class User {
      * 使用@Column(unique = true, nullable = false)注解，表示这是一个唯一的、不允许为空的列
      */
     @Column(unique = true, nullable = false)
+    @JsonSerialize
     private String name;
 
     /**
