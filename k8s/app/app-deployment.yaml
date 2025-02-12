@@ -1,0 +1,46 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: account-balance-app
+spec:
+  selector:
+    matchLabels:
+      app: account-balance-app
+  replicas: 2
+  template:
+    metadata:
+      labels:
+        app: account-balance-app
+    spec:
+      containers:
+      - name: account-balance-app
+        image: account-balance-app:latest
+        ports:
+        - containerPort: 8080
+        env:
+        - name: SPRING_DATASOURCE_URL
+          value: jdbc:mysql://mysql:3306/VTMSystem?useSSL=false
+        - name: SPRING_DATASOURCE_USERNAME
+          value: root
+        - name: SPRING_DATASOURCE_PASSWORD
+          value: "123456"
+        - name: SPRING_DATA_REDIS_HOST
+          value: redis
+        resources:
+          requests:
+            cpu: "200m"
+            memory: "256Mi"
+          limits:
+            cpu: "500m"
+            memory: "512Mi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: account-balance-app
+spec:
+  type: LoadBalancer
+  ports:
+  - port: 8080
+  selector:
+    app: account-balance-app 
