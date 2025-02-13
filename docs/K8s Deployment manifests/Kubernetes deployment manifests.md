@@ -1,231 +1,364 @@
-# Kubernetes 部署清单
+# Kubernetes 完整部署指南
 
-## 1. 前置条件
+## 1. 项目结构
+```
+k8s/
+├── app/                    # 应用相关配置
+│   ├── app-deployment.yaml # 应用部署配置
+│   └── app-hpa.yaml       # 自动扩缩容配置
+├── storage/               # 存储相关配置
+│   ├── mysql-pv.yaml      # MySQL 持久卷
+│   └── mysql-pvc.yaml     # MySQL 持久卷声明
+├── metrics-server/        # 指标服务配置
+│   ├── metrics-server.yaml     # 指标服务部署
+│   └── metrics-server-api.yaml # 指标 API 服务
+├── mysql/                 # MySQL 相关配置
+│   └── mysql-deployment.yaml   # MySQL 部署配置
+├── redis/                 # Redis 相关配置
+│   └── redis-deployment.yaml   # Redis 部署配置
+└── ingress-nginx/        # Ingress 相关配置
+    ├── ingress.yaml           # 应用 Ingress 规则
+    └── ingress-controller.yaml # Ingress Controller 配置
 
-### 1.1 环境要求
-- JDK 23
-- Maven 3.8+
-- Docker Desktop (启用 Kubernetes)
-- kubectl 命令行工具
+```
 
-### 1.2 相关依赖版本
-- Spring Boot 3.4.2
-- MySQL 8.0
-- Redis Latest
+## 2. 部署步骤
 
-## 2. 项目结构
-.
-├── Dockerfile
-└── k8s/
-├── app/
-│ ├── app-deployment.yaml
-│ └── hpa.yaml
-├── mysql/
-│ └── mysql-deployment.yaml
-├── redis/
-│ └── redis-deployment.yaml
-├── ingress-nginx/
-│ └── deploy.yaml
-└── ingress.yaml
+### 2.1 准备工作
+1. 安装 Docker Desktop
+2. 启用 Kubernetes
+3. 确保 kubectl 可用：
+```bash
+kubectl version
+```
 
-## 3. 部署步骤
-
-### 3.1 准备工作
-
-```bash:k8s/Kubernetes deployment manifests.md
-# 确保Kubernetes集群正在运行
-kubectl cluster-info
-
-# 创建命名空间
+### 2.2 创建命名空间
+```bash
 kubectl create namespace account-balance
 ```
 
-### 3.2 构建和部署
+### 2.3 部署存储
+1. 创建 PV：
+```yaml
+# k8s/storage/mysql-pv.yaml
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: mysql-pv
+spec:
+  capacity:
+    storage: 1Gi
+  accessModes:
+    - ReadWriteOnce
+  hostPath:
+    path: "/mnt/data"
+```
 
-#### 3.2.1 构建应用
+2. 创建 PVC：
+```yaml
+# k8s/storage/mysql-pvc.yaml
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mysql-pv-claim
+  namespace: account-balance
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+```
+
+3. 应用存储配置：
 ```bash
-# 构建应用
-mvn clean package -DskipTests
+kubectl apply -f k8s/storage/mysql-pv.yaml
+kubectl apply -f k8s/storage/mysql-pvc.yaml
+```
 
-# 构建Docker镜像
+### 2.4 部署 MySQL
+```yaml
+# k8s/mysql/mysql-deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mysql
+  namespace: account-balance
+spec:
+  selector:
+    matchLabels:
+      app: mysql
+  template:
+    spec:
+      containers:
+      - name: mysql
+        image: mysql:8.0
+        env:
+        - name: MYSQL_ROOT_PASSWORD
+          value: "123456"
+        - name: MYSQL_DATABASE
+          value: "VTMSystem"
+        ports:
+        - containerPort: 3306
+        volumeMounts:
+        - name: mysql-persistent-storage
+          mountPath: /var/lib/mysql
+      volumes:
+      - name: mysql-persistent-storage
+        persistentVolumeClaim:
+          claimName: mysql-pv-claim
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysql
+  namespace: account-balance
+spec:
+  ports:
+  - port: 3306
+  selector:
+    app: mysql
+```
+
+### 2.5 部署 Redis
+```yaml
+# k8s/redis/redis-deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis
+  namespace: account-balance
+spec:
+  selector:
+    matchLabels:
+      app: redis
+  template:
+    spec:
+      containers:
+      - name: redis
+        image: redis:latest
+        ports:
+        - containerPort: 6379
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis
+  namespace: account-balance
+spec:
+  ports:
+  - port: 6379
+  selector:
+    app: redis
+```
+
+### 2.6 部署应用
+1. 构建应用镜像：
+```dockerfile
+# Dockerfile
+FROM openjdk:17-jdk-slim
+WORKDIR /app
+COPY target/*.jar app.jar
+EXPOSE 8080
+ENTRYPOINT ["java","-jar","app.jar"]
+```
+
+```bash
 docker build -t account-balance-app:latest .
 ```
 
-#### 3.2.2 部署 MySQL
-```bash
-# 部署 MySQL
-kubectl apply -f k8s/mysql/mysql-deployment.yaml -n account-balance
-
-# 验证 MySQL 部署
-kubectl get pods -n account-balance -l app=mysql
+2. 部署应用：
+```yaml
+# k8s/app/app-deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: account-balance-app
+  namespace: account-balance
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: account-balance-app
+  template:
+    spec:
+      containers:
+      - name: account-balance-app
+        image: account-balance-app:latest
+        ports:
+        - containerPort: 8080
+        env:
+        - name: SPRING_DATASOURCE_URL
+          value: jdbc:mysql://mysql:3306/VTMSystem?useSSL=false
+        - name: SPRING_DATASOURCE_USERNAME
+          value: root
+        - name: SPRING_DATASOURCE_PASSWORD
+          value: "123456"
+        - name: SPRING_DATA_REDIS_HOST
+          value: redis
 ```
 
-#### 3.2.3 部署 Redis
+### 2.7 配置 Ingress
+1. 安装 Ingress Controller：
 ```bash
-# 部署 Redis
-kubectl apply -f k8s/redis/redis-deployment.yaml -n account-balance
-
-# 验证 Redis 部署
-kubectl get pods -n account-balance -l app=redis
+kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.8.2/deploy/static/provider/cloud/deploy.yaml
 ```
 
-#### 3.2.4 部署应用程序
-```bash
-# 部署应用
-kubectl apply -f k8s/app/app-deployment.yaml -n account-balance
-
-# 验证应用部署
-kubectl get pods -n account-balance -l app=account-balance-app
+2. 配置 Ingress 规则：
+```yaml
+# k8s/ingress-nginx/ingress.yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: account-balance-ingress
+  namespace: account-balance
+spec:
+  ingressClassName: nginx
+  rules:
+  - http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: account-balance-app
+            port:
+              number: 8080
 ```
 
-#### 3.2.5 配置 HPA
-```bash
-# 部署 HPA
-kubectl apply -f k8s/app/hpa.yaml -n account-balance
+### 2.8 配置 HPA
+1. 部署 metrics-server：
+```yaml
+# k8s/metrics-server/metrics-server.yaml
+# ... metrics-server 配置 ...
 
-# 验证 HPA 配置
-kubectl get hpa -n account-balance
+# k8s/metrics-server/metrics-server-api.yaml
+# ... metrics API 配置 ...
 ```
 
-#### 3.2.6 部署 Ingress-Nginx
-```bash
-# 部署 Ingress Controller
-kubectl apply -f k8s/ingress-nginx/deploy.yaml
-
-# 验证 Ingress Controller 部署
-kubectl get pods -n ingress-nginx
+2. 配置 HPA：
+```yaml
+# k8s/app/app-hpa.yaml
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: account-balance-app-hpa
+  namespace: account-balance
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: account-balance-app
+  minReplicas: 2
+  maxReplicas: 5
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
 ```
 
-#### 3.2.7 配置 Ingress 规则
-```bash
-# 部署 Ingress 规则
-kubectl apply -f k8s/ingress.yaml -n account-balance
+## 3. 验证部署
 
-# 验证 Ingress 配置
+### 3.1 检查所有组件
+```bash
+# 检查所有 Pod
+kubectl get pods -n account-balance
+
+# 检查所有服务
+kubectl get svc -n account-balance
+
+# 检查 Ingress
 kubectl get ingress -n account-balance
-```
 
-## 4. 配置说明
-
-### 4.1 应用配置
-- 应用副本数：2
-- 容器端口：8080
-- 资源限制：
-  - 请求：CPU 200m，内存 256Mi
-  - 限制：CPU 500m，内存 512Mi
-
-### 4.2 HPA 配置
-- 最小副本数：2
-- 最大副本数：5
-- CPU 使用率阈值：70%
-- 内存使用率阈值：80%
-
-### 4.3 数据库配置
-- MySQL 版本：8.0
-- 数据库名：VTMSystem
-- 持久化存储：使用 PersistentVolumeClaim
-- 默认密码：123456（生产环境建议修改）
-
-### 4.4 Redis 配置
-- 最新版本
-- 单副本部署
-- 端口：6379
-
-### 4.5 Ingress 配置
-- 域名：account.local
-- 路径：/
-- 后端服务：account-balance-app:8080
-
-## 5. 监控和维护
-
-### 5.1 查看状态
-```bash
-# 查看所有资源
-kubectl get all -n account-balance
-
-# 查看 Pod 日志
-kubectl logs -f deployment/account-balance-app -n account-balance
-
-# 查看 HPA 状态
+# 检查 HPA
 kubectl get hpa -n account-balance
 ```
 
-### 5.2 扩缩容操作
+### 3.2 验证数据库连接
 ```bash
-# 手动扩容
-kubectl scale deployment account-balance-app --replicas=3 -n account-balance
+# 测试 MySQL 连接
+kubectl exec -it $(kubectl get pod -l app=mysql -n account-balance -o jsonpath='{.items[0].metadata.name}') -n account-balance -- mysql -u root -p123456 -e "SELECT 1"
 
-# 查看 HPA 自动扩缩容状态
-kubectl describe hpa account-balance-app-hpa -n account-balance
+# 测试 Redis 连接
+kubectl exec -it $(kubectl get pod -l app=redis -n account-balance -o jsonpath='{.items[0].metadata.name}') -n account-balance -- redis-cli ping
 ```
 
-### 5.3 更新配置
+### 3.3 验证应用访问
 ```bash
-# 更新部署配置
-kubectl apply -f k8s/app/app-deployment.yaml -n account-balance
-
-# 重启部署
-kubectl rollout restart deployment account-balance-app -n account-balance
+# 通过 Ingress 访问
+curl http://localhost/
 ```
 
-## 6. 故障排除
+## 4. 监控和维护
 
-### 6.1 常见问题检查
-```bash
-# 检查 Pod 状态
-kubectl describe pod <pod-name> -n account-balance
-
-# 检查服务状态
-kubectl describe service account-balance-app -n account-balance
-
-# 检查 Ingress 状态
-kubectl describe ingress account-balance-ingress -n account-balance
-```
-
-### 6.2 日志查看
+### 4.1 查看日志
 ```bash
 # 应用日志
-kubectl logs -f deployment/account-balance-app -n account-balance
+kubectl logs -f -l app=account-balance-app -n account-balance
 
 # MySQL 日志
-kubectl logs -f deployment/mysql -n account-balance
+kubectl logs -f -l app=mysql -n account-balance
 
 # Redis 日志
-kubectl logs -f deployment/redis -n account-balance
-
-# Ingress Controller 日志
-kubectl logs -f deployment/ingress-nginx-controller -n ingress-nginx
+kubectl logs -f -l app=redis -n account-balance
 ```
 
-## 7. 安全考虑
-- 所有服务运行在专用命名空间内
-- MySQL 使用持久化存储
-- 可配置 TLS 证书（在 Ingress 配置中）
-- 资源限制防止资源耗尽
-- HPA 确保服务可用性和性能
+### 4.2 资源监控
+```bash
+# 节点资源使用
+kubectl top nodes
 
-## 8. 备份和恢复
-- MySQL 数据使用 PersistentVolume 持久化
-- 建议定期备份 MySQL 数据
-- 可以使用 kubectl cp 命令备份配置文件
+# Pod 资源使用
+kubectl top pods -n account-balance
+```
 
-## 9. 注意事项
-1. 生产环境部署前：
-   - 修改默认密码
-   - 配置适当的资源限制
-   - 启用 TLS
-   - 配置备份策略
-   
-2. 性能优化：
-   - 根据实际负载调整 HPA 配置
-   - 监控资源使用情况
-   - 适时调整资源限制
+### 4.3 扩缩容监控
+```bash
+# 监控 HPA
+kubectl get hpa -n account-balance -w
+```
 
-3. 安全加固：
-   - 使用 Secret 管理敏感信息
-   - 定期更新密码
-   - 限制网络访问
-   - 启用审计日志
+## 5. 故障排除
 
+### 5.1 Pod 启动问题
+```bash
+# 查看 Pod 详情
+kubectl describe pod <pod-name> -n account-balance
 
+# 查看 Pod 日志
+kubectl logs <pod-name> -n account-balance
+```
 
+### 5.2 存储问题
+```bash
+# 检查 PV 状态
+kubectl get pv
+
+# 检查 PVC 状态
+kubectl get pvc -n account-balance
+```
+
+### 5.3 网络问题
+```bash
+# 检查 Service
+kubectl get svc -n account-balance
+
+# 检查 Endpoints
+kubectl get endpoints -n account-balance
+```
+
+## 6. 最佳实践
+1. 定期备份 MySQL 数据
+2. 监控资源使用情况
+3. 及时更新镜像和配置
+4. 保持日志监控
+5. 定期检查 HPA 状态
