@@ -4,8 +4,8 @@ metadata:
   name: account-balance-ingress
   annotations:
     nginx.ingress.kubernetes.io/rewrite-target: /
-    kubernetes.io/ingress.class: "nginx"
 spec:
+  ingressClassName: nginx  # 使用这个替代旧的 annotation
   rules:
   - host: account.local  # 可以根据需要修改域名
     http:
