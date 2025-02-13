@@ -1,0 +1,24 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: account-balance-ingress
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+spec:
+  ingressClassName: nginx  # 使用这个替代旧的 annotation
+  rules:
+  - host: account.local  # 可以根据需要修改域名
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: account-balance-app  # 确保这个名称与 Service 名称匹配
+            port:
+              number: 8080
+  # 如果需要配置 TLS，可以添加以下配置
+  # tls:
+  # - hosts:
+  #   - account.local
+  #   secretName: account-tls-secret 
