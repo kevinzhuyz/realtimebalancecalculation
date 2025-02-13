@@ -14,7 +14,7 @@ spec:
         pathType: Prefix
         backend:
           service:
-            name: account-balance-app
+            name: account-balance-app  # 确保这个名称与 Service 名称匹配
             port:
               number: 8080
   # 如果需要配置 TLS，可以添加以下配置
