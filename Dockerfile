@@ -1,4 +1,4 @@
-FROM openjdk:23-slim
+FROM azul/zulu-openjdk:21-latest
 WORKDIR /app
 COPY target/*.jar app.jar
 EXPOSE 8080
