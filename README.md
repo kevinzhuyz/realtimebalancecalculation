@@ -1,7 +1,7 @@
 # Account Balance Calculation System
 
 ## 项目简介
-Account Balance Calculation System 是一个基于 Spring Boot 的实时账户余额计算系统，提供账户管理、交易处理和余额计算等功能。系统采用分布式架构设计，使用 Redis 实现分布式缓存和锁，保证交易的一致性和可靠性。
+Account Balance Calculation System 是一个基于 Spring Boot 的实时账户余额计算系统，提供账户管理、交易处理和余额计算等功能。系统采用分布式架构设计，使用 Redis 实现分布式缓存和锁，保证交易一致性和可靠性。
 
 ## 技术栈
 - Java 23
