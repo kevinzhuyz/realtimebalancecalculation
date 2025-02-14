@@ -5,7 +5,7 @@ Account Balance Calculation System 是一个基于 Spring Boot 的实时账户�
 
 ## 技术栈
 - Java 23
-- Spring Boot 3.4.2
+- Spring Boot 3.2.2
 - Spring Data JPA
 - MySQL 8.0
 - Redis
