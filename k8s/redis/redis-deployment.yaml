@@ -15,6 +15,7 @@ spec:
       containers:
       - name: redis
         image: redis:latest
+        args: ["--requirepass", "123456"]
         ports:
         - containerPort: 6379
 ---

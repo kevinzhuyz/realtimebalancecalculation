@@ -29,6 +29,9 @@ public class RedisConfig {
     @Value("${spring.data.redis.port}")
     private int port;
 
+    @Value("${spring.data.redis.password}")
+    private String password;
+
     /**
      * 创建并配置 RedisTemplate 实例
      *
@@ -74,7 +77,7 @@ public class RedisConfig {
         RedisStandaloneConfiguration config = new RedisStandaloneConfiguration();
         config.setHostName(host);
         config.setPort(port);
-        // 不设置用户名和密码，使用默认的无认证连接
+        config.setPassword(password);  // 设置密码
         return new LettuceConnectionFactory(config);
     }
 }

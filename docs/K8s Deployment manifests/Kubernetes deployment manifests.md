@@ -27,243 +27,136 @@ k8s/
 ### 2.1 准备工作
 1. 安装 Docker Desktop
 2. 启用 Kubernetes
-3. 确保 kubectl 可用：
+3. 重新编译项目，确保项目的jar包是最新的：
 ```bash
-kubectl version
-```
+ mvn clean package -DskipTests
 
-### 2.2 创建命名空间
+
+### 2.2 创建命名空间和查看命名空间
 ```bash
 kubectl create namespace account-balance
+# 查看某个命名空间的详细信息
+kubectl describe namespace account-balance
+# 查看所有命名空间
+kubectl get namespaces
+# 查看特定命名空间中的所有资源
+kubectl get all -n account-balance
+
+# 查看特定命名空间中的 pods
+kubectl get pods -n account-balance
+
+# 查看特定命名空间中的服务
+kubectl get services -n account-balance
+# 实时监控命名空间变化
+kubectl get ns --watch
+
+# 实时监控特定命名空间的 pods
+kubectl get pods -n account-balance --watch
 ```
 
 ### 2.3 部署存储
-1. 创建 PV：
+1. 创建 PV配置文件：
 ```yaml
-# k8s/storage/mysql-pv.yaml
-apiVersion: v1
-kind: PersistentVolume
-metadata:
-  name: mysql-pv
-spec:
-  capacity:
-    storage: 1Gi
-  accessModes:
-    - ReadWriteOnce
-  hostPath:
-    path: "/mnt/data"
-```
-
-2. 创建 PVC：
-```yaml
-# k8s/storage/mysql-pvc.yaml
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: mysql-pv-claim
-  namespace: account-balance
-spec:
-  accessModes:
-    - ReadWriteOnce
-  resources:
-    requests:
-      storage: 1Gi
-```
-
-3. 应用存储配置：
-```bash
+# k8s/storage/mysql-pv.yaml（配置文件）
+部署PV
 kubectl apply -f k8s/storage/mysql-pv.yaml
+```
+
+2. 创建 PVC配置文件：
+```yaml
+# k8s/storage/mysql-pvc.yaml（配置文件）
+部署PVC
 kubectl apply -f k8s/storage/mysql-pvc.yaml
 ```
 
+
 ### 2.4 部署 MySQL
+1. 创建mysql部署配置文件：
 ```yaml
-# k8s/mysql/mysql-deployment.yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: mysql
-  namespace: account-balance
-spec:
-  selector:
-    matchLabels:
-      app: mysql
-  template:
-    spec:
-      containers:
-      - name: mysql
-        image: mysql:8.0
-        env:
-        - name: MYSQL_ROOT_PASSWORD
-          value: "123456"
-        - name: MYSQL_DATABASE
-          value: "VTMSystem"
-        ports:
-        - containerPort: 3306
-        volumeMounts:
-        - name: mysql-persistent-storage
-          mountPath: /var/lib/mysql
-      volumes:
-      - name: mysql-persistent-storage
-        persistentVolumeClaim:
-          claimName: mysql-pv-claim
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: mysql
-  namespace: account-balance
-spec:
-  ports:
-  - port: 3306
-  selector:
-    app: mysql
+# k8s/mysql/mysql-deployment.yaml （配置文件）
+2. 部署mysql
+```bash
+kubectl apply -f k8s/mysql/mysql-deployment.yaml -n account-balance
 ```
 
 ### 2.5 部署 Redis
+1. 创建redis配置文件：
 ```yaml
-# k8s/redis/redis-deployment.yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: redis
-  namespace: account-balance
-spec:
-  selector:
-    matchLabels:
-      app: redis
-  template:
-    spec:
-      containers:
-      - name: redis
-        image: redis:latest
-        ports:
-        - containerPort: 6379
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: redis
-  namespace: account-balance
-spec:
-  ports:
-  - port: 6379
-  selector:
-    app: redis
+# k8s/redis/redis-deployment.yaml（配置文件）
+```
+2. 部署redis
+```bash
+kubectl apply -f k8s/redis/redis-deployment.yaml -n account-balance
 ```
 
 ### 2.6 部署应用
-1. 构建应用镜像：
-```dockerfile
-# Dockerfile
-FROM openjdk:17-jdk-slim
-WORKDIR /app
-COPY target/*.jar app.jar
-EXPOSE 8080
-ENTRYPOINT ["java","-jar","app.jar"]
-```
+1. 创建Dockerfile：
 
+```dockerfile
+  # Dockerfile（配置文件）
+
+```
+2. 构建应用镜像：
 ```bash
 docker build -t account-balance-app:latest .
 ```
 
-2. 部署应用：
-```yaml
-# k8s/app/app-deployment.yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: account-balance-app
-  namespace: account-balance
-spec:
-  replicas: 2
-  selector:
-    matchLabels:
-      app: account-balance-app
-  template:
-    spec:
-      containers:
-      - name: account-balance-app
-        image: account-balance-app:latest
-        ports:
-        - containerPort: 8080
-        env:
-        - name: SPRING_DATASOURCE_URL
-          value: jdbc:mysql://mysql:3306/VTMSystem?useSSL=false
-        - name: SPRING_DATASOURCE_USERNAME
-          value: root
-        - name: SPRING_DATASOURCE_PASSWORD
-          value: "123456"
-        - name: SPRING_DATA_REDIS_HOST
-          value: redis
+3. 部署应用：
+```bash
+kubectl apply -f k8s/app/app-deployment.yaml -n account-balance
 ```
-
+# 重启整个部署(如果应用部署完后有问题，需要重启整个部署)
+kubectl rollout restart deployment account-balance-app -n account-balance
 ### 2.7 配置 Ingress
 1. 安装 Ingress Controller：
 ```bash
 kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.8.2/deploy/static/provider/cloud/deploy.yaml
+2. 创建配置文件
+```yaml
+# k8s/ingress-nginx/deploy.yaml（配置文件）
+```
+3. 部署 Ingress
+```bash
+kubectl apply -f k8s/ingress-nginx/deploy.yaml
 ```
 
 2. 配置 Ingress 规则：
+
+1. 创建Ingress规则配置文件：  
 ```yaml
-# k8s/ingress-nginx/ingress.yaml
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: account-balance-ingress
-  namespace: account-balance
-spec:
-  ingressClassName: nginx
-  rules:
-  - http:
-      paths:
-      - path: /
-        pathType: Prefix
-        backend:
-          service:
-            name: account-balance-app
-            port:
-              number: 8080
+# k8s/ingress-nginx/ingress.yaml（配置文件）
+```
+2. 部署 Ingress规则  
+```bash
+kubectl apply -f k8s/ingress-nginx/ingress.yaml
 ```
 
 ### 2.8 配置 HPA
 1. 部署 metrics-server：
+1. 创建metrics-server配置文件：   
 ```yaml
-# k8s/metrics-server/metrics-server.yaml
+# k8s/metrics-server/metrics-server.yaml（配置文件）
 # ... metrics-server 配置 ...
-
-# k8s/metrics-server/metrics-server-api.yaml
-# ... metrics API 配置 ...
+部署metrics-server
+```bash
+kubectl apply -f k8s/metrics-server/metrics-server.yaml
 ```
 
-2. 配置 HPA：
+2. 创建metrics API配置文件：
 ```yaml
-# k8s/app/app-hpa.yaml
-apiVersion: autoscaling/v2
-kind: HorizontalPodAutoscaler
-metadata:
-  name: account-balance-app-hpa
-  namespace: account-balance
-spec:
-  scaleTargetRef:
-    apiVersion: apps/v1
-    kind: Deployment
-    name: account-balance-app
-  minReplicas: 2
-  maxReplicas: 5
-  metrics:
-  - type: Resource
-    resource:
-      name: cpu
-      target:
-        type: Utilization
-        averageUtilization: 70
-  - type: Resource
-    resource:
-      name: memory
-      target:
-        type: Utilization
-        averageUtilization: 80
+# k8s/metrics-server/metrics-server-api.yaml（配置文件）
+# ... metrics API 配置 ...
+部署metrics API 
+```bash
+kubectl apply -f k8s/metrics-server/metrics-server-api.yaml
+
+2. 配置 HPA：
+创建HPA配置文件：
+```yaml
+# k8s/app/app-hpa.yaml（配置文件）  
+实现HPA配置
+```bash
+kubectl apply -f k8s/app/app-hpa.yaml -n account-balance  
 ```
 
 ## 3. 验证部署
