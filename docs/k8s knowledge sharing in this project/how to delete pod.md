@@ -7,6 +7,7 @@
 # 语法
 kubectl delete pod <pod-name> -n <namespace>
 
+
 # 示例：删除特定的应用 Pod
 kubectl delete pod account-balance-app-6fb6789c-72xzd -n account-balance
 ```

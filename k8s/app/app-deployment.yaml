@@ -2,11 +2,11 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: account-balance-app
+  namespace: account-balance
 spec:
   selector:
     matchLabels:
       app: account-balance-app
-  replicas: 2
   template:
     metadata:
       labels:
@@ -19,29 +19,50 @@ spec:
         ports:
         - containerPort: 8080
         env:
+        - name: SPRING_PROFILES_ACTIVE
+          value: "k8s"
         - name: SPRING_DATASOURCE_URL
-          value: "jdbc:mysql://mysql:3306/VTMSystem?useSSL=false"
+          value: "jdbc:mysql://host.docker.internal:3306/VTMSystem?useSSL=false&allowPublicKeyRetrieval=true"
         - name: SPRING_DATASOURCE_USERNAME
           value: "root"
         - name: SPRING_DATASOURCE_PASSWORD
           value: "123456"
         - name: SPRING_DATA_REDIS_HOST
-          value: redis
+          value: "host.docker.internal"  # 改回使用host.docker.internal
+        - name: SPRING_DATA_REDIS_PORT
+          value: "6379"
+        - name: SPRING_DATA_REDIS_PASSWORD
+          value: "123456"
+        - name: LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_DATA_REDIS
+          value: "DEBUG"
+        - name: LOGGING_LEVEL_IO_LETTUCE_CORE
+          value: "DEBUG"
+        - name: SPRING_CACHE_TYPE
+          value: "redis"
+        - name: SPRING_CACHE_REDIS_TIME_TO_LIVE
+          value: "3600000"
+        - name: SPRING_CACHE_REDIS_ENABLE_STATISTICS
+          value: "true"
+        - name: SPRING_CACHE_REDIS_KEY_PREFIX
+          value: "account:"
+        - name: SPRING_CACHE_REDIS_USE_KEY_PREFIX
+          value: "true"
+        - name: SPRING_CACHE_REDIS_CACHE_NULL_VALUES
+          value: "false"
+        - name: LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_CACHE
+          value: "DEBUG"
+        - name: LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_DATA_REDIS_CORE
+          value: "TRACE"
+        - name: LOGGING_LEVEL_IO_LETTUCE_CORE_PROTOCOL
+          value: "TRACE"
+        - name: SPRING_DATA_REDIS_REPOSITORIES_ENABLED
+          value: "true"
+        - name: SPRING_CACHE_REDIS_SERIALIZER
+          value: "org.springframework.data.redis.serializer.GenericJackson2JsonRedisSerializer"
         resources:
           requests:
-            cpu: "200m"
+            cpu: "200m"      # 增加 CPU 请求
             memory: "256Mi"
           limits:
-            cpu: "500m"
-            memory: "512Mi"
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: account-balance-app
-spec:
-  type: LoadBalancer
-  ports:
-  - port: 8080
-  selector:
-    app: account-balance-app 
+            cpu: "1000m"     # 增加 CPU 限制
+            memory: "1Gi"

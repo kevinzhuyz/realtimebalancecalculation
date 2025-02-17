@@ -18,10 +18,10 @@ public interface AccountService {
     /**
      * 创建新账户
      *
-     * @param request 包含创建账户所需信息的请求对象
+     * @param account 包含创建账户所需信息的账户对象
      * @return 返回新创建的Account对象
      */
-    Account createAccount(CreateAccountRequest request);
+    Account createAccount(Account account);
 
     /**
      * 更新账户余额

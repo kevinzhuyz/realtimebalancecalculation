@@ -1,6 +1,6 @@
 package com.kevinbank.accountbalancecalculation.service.impl;
 
-import com.kevinbank.accountbalancecalculation.model.User;
+import com.kevinbank.accountbalancecalculation.entity.User;
 import com.kevinbank.accountbalancecalculation.model.CreateUserRequest;
 import com.kevinbank.accountbalancecalculation.mapper.UserMapper;
 import com.kevinbank.accountbalancecalculation.repository.UserRepository;
@@ -12,6 +12,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import com.kevinbank.accountbalancecalculation.service.CacheService;
 import java.util.concurrent.TimeUnit;
+import org.springframework.cache.annotation.CachePut;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.CacheEvict;
 
 /**
  * 用户服务实现类
@@ -44,29 +47,17 @@ public class UserServiceImpl implements UserService {
      */
     @Override
     @Transactional
+    @CachePut(value = "users", key = "#result.id", unless = "#result == null")
     public User createUser(CreateUserRequest request) {
-        // 检查用户名是否已存在
+        log.debug("Creating user with request: {}", request);
         if (userRepository.existsByName(request.getName())) {
             throw new RuntimeException("用户名已存在");
         }
 
-        // 使用 MapStruct 转换对象
-        User user = userMapper.toUser(request);
-
-        // 加密密码
+        User user = userMapper.toEntity(request);
         user.setPasswordHash(passwordEncoder.encode(request.getPassword()));
 
-        try {
-            // 保存用户
-            User savedUser = userRepository.save(user);
-            // 保存到缓存
-            String cacheKey = USER_CACHE_KEY_PREFIX + savedUser.getId();
-            cacheService.set(cacheKey, savedUser, CACHE_TIMEOUT, TimeUnit.MINUTES);
-            return savedUser;
-        } catch (Exception e) {
-            log.error("创建用户失败", e);
-            throw new RuntimeException("创建用户失败");
-        }
+        return userRepository.save(user);
     }
 
     /**
@@ -77,24 +68,11 @@ public class UserServiceImpl implements UserService {
      * @throws RuntimeException 如果用户不存在，则抛出运行时异常
      */
     @Override
+    @Cacheable(value = "users", key = "#userId", unless = "#result == null")
     public User getUserById(Long userId) {
-        String cacheKey = USER_CACHE_KEY_PREFIX + userId;
-        
-        // 先从缓存获取
-        User user = cacheService.get(cacheKey, User.class);
-        if (user != null) {
-            log.info("User found in cache: {}", cacheKey);
-            return user;
-        }
-        
-        // 缓存未命中，从数据库获取
-        log.info("User not found in cache, fetching from database: {}", userId);
-        user = userRepository.findById(userId)
+        log.debug("Getting user by id: {}", userId);
+        return userRepository.findById(userId)
             .orElseThrow(() -> new RuntimeException("User not found: " + userId));
-            
-        // 放入缓存
-        cacheService.set(cacheKey, user, CACHE_TIMEOUT, TimeUnit.MINUTES);
-        return user;
     }
 
     /**
@@ -107,14 +85,11 @@ public class UserServiceImpl implements UserService {
     @Override
     @Transactional
     public User updateUser(User user) {
-        if (!userRepository.existsById(user.getId())) {
-            throw new RuntimeException("用户不存在");
+        User existingUser = getUserById(user.getId());
+        if (existingUser == null) {
+            throw new RuntimeException("User not found");
         }
-        User updatedUser = userRepository.save(user);
-        // 更新缓存
-        String cacheKey = USER_CACHE_KEY_PREFIX + updatedUser.getId();
-        cacheService.set(cacheKey, updatedUser, CACHE_TIMEOUT, TimeUnit.MINUTES);
-        return updatedUser;
+        return userRepository.save(user);
     }
 
     /**
@@ -124,7 +99,9 @@ public class UserServiceImpl implements UserService {
      * @throws RuntimeException 如果用户不存在，则抛出运行时异常
      */
     @Override
+    @CacheEvict(value = "users", key = "#userId")
     public void deleteUser(Long userId) {
+        log.debug("Deleting user with id: {}", userId);
         if (!userRepository.existsById(userId)) {
             throw new RuntimeException("用户不存在");
         }

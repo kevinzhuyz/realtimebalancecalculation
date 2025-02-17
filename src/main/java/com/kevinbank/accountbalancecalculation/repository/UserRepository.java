@@ -1,6 +1,6 @@
 package com.kevinbank.accountbalancecalculation.repository;
 
-import com.kevinbank.accountbalancecalculation.model.User;
+import com.kevinbank.accountbalancecalculation.entity.User;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 

@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.concurrent.TimeUnit;
 import jakarta.annotation.PostConstruct;
 import java.util.Optional;
+import java.time.LocalDateTime;
 
 /**
  * AccountServiceImpl类实现了AccountService接口，负责处理账户相关的业务逻辑。
@@ -70,44 +71,53 @@ public class AccountServiceImpl implements AccountService {
     /**
      * 创建新账户。
      *
-     * @param request 包含创建账户所需信息的请求对象。
+     * @param account 包含创建账户所需信息的账户对象。
      * @return 返回创建成功的账户对象。
      * @throws RuntimeException 如果用户不存在或账户号码已存在，则抛出运行时异常。
      */
     @Override
     @Transactional
-    public Account createAccount(CreateAccountRequest request) {
-        if (!userRepository.existsById(request.getUserId())) {
-            throw new RuntimeException("用户不存在");
-        }
-
-        if (accountRepository.existsByAccountNumber(request.getAccountNumber())) {
-            throw new RuntimeException("账户号码已存在");
-        }
-
-        Account account = accountMapper.toAccount(request);
-
+    public Account createAccount(Account account) {
         try {
-            account = accountRepository.save(account);
-
-            if (request.getBalance() != null && request.getBalance().compareTo(BigDecimal.ZERO) > 0) {
-                CreateTransactionRequest transactionRequest = new CreateTransactionRequest();
-                transactionRequest.setTargetAccountId(account.getId());
-                transactionRequest.setAmount(request.getBalance());
-                transactionRequest.setType(TransactionType.DEPOSIT);
-                transactionRequest.setDescription("开户存款");
-
-                transactionService.createTransaction(transactionRequest);
+            log.info("Starting account creation process...");
+            
+            // 验证用户是否存在
+            if (!userRepository.existsById(account.getUserId())) {
+                log.error("User not found with ID: {}", account.getUserId());
+                throw new RuntimeException("User not found");
             }
+            log.info("User validation successful for ID: {}", account.getUserId());
 
-            // 保存到缓存
-            String cacheKey = ACCOUNT_CACHE_KEY_PREFIX + account.getId();
-            cacheService.set(cacheKey, account, CACHE_TIMEOUT, TimeUnit.MINUTES);
-
-            return account;
+            // 设置创建时间
+            account.setCreatedAt(LocalDateTime.now());
+            
+            log.info("Saving account to database: {}", account);
+            Account savedAccount = accountRepository.save(account);
+            log.info("Account saved to database with ID: {}", savedAccount.getId());
+            
+            // 更新缓存
+            String cacheKey = ACCOUNT_CACHE_KEY_PREFIX + savedAccount.getId();
+            log.info("Attempting to set cache with key: {} and value: {}", cacheKey, savedAccount);
+            
+            try {
+                cacheService.set(cacheKey, savedAccount, CACHE_TIMEOUT, TimeUnit.MINUTES);
+                
+                // 验证缓存
+                Account cachedAccount = cacheService.get(cacheKey, Account.class);
+                if (cachedAccount != null) {
+                    log.info("Cache verification successful for key: {}", cacheKey);
+                    log.debug("Cached account details: {}", cachedAccount);
+                } else {
+                    log.warn("Cache verification failed for key: {}", cacheKey);
+                }
+            } catch (Exception e) {
+                log.error("Error while caching account: {}", e.getMessage(), e);
+            }
+            
+            return savedAccount;
         } catch (Exception e) {
-            log.error("创建账户失败", e);
-            throw new RuntimeException("创建账户失败");
+            log.error("Error creating account: {}", e.getMessage(), e);
+            throw e;
         }
     }
 

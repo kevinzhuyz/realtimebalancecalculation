@@ -29,10 +29,10 @@ k8s/
 2. 启用 Kubernetes
 3. 重新编译项目，确保项目的jar包是最新的：
 ```bash
- mvn clean package -DskipTests
+ mvn clean package 
 
 
-### 2.2 创建命名空间和查看命名空间
+ 2.2 创建命名空间和查看命名空间
 ```bash
 kubectl create namespace account-balance
 # 查看某个命名空间的详细信息
@@ -89,25 +89,8 @@ kubectl apply -f k8s/mysql/mysql-deployment.yaml -n account-balance
 kubectl apply -f k8s/redis/redis-deployment.yaml -n account-balance
 ```
 
-### 2.6 部署应用
-1. 创建Dockerfile：
 
-```dockerfile
-  # Dockerfile（配置文件）
-
-```
-2. 构建应用镜像：
-```bash
-docker build -t account-balance-app:latest .
-```
-
-3. 部署应用：
-```bash
-kubectl apply -f k8s/app/app-deployment.yaml -n account-balance
-```
-# 重启整个部署(如果应用部署完后有问题，需要重启整个部署)
-kubectl rollout restart deployment account-balance-app -n account-balance
-### 2.7 配置 Ingress
+### 2.6 配置 Ingress
 1. 安装 Ingress Controller：
 ```bash
 kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.8.2/deploy/static/provider/cloud/deploy.yaml
@@ -131,7 +114,7 @@ kubectl apply -f k8s/ingress-nginx/deploy.yaml
 kubectl apply -f k8s/ingress-nginx/ingress.yaml
 ```
 
-### 2.8 配置 HPA
+### 2.7 配置 HPA
 1. 部署 metrics-server：
 1. 创建metrics-server配置文件：   
 ```yaml
@@ -150,7 +133,7 @@ kubectl apply -f k8s/metrics-server/metrics-server.yaml
 ```bash
 kubectl apply -f k8s/metrics-server/metrics-server-api.yaml
 
-2. 配置 HPA：
+3. 配置 HPA：
 创建HPA配置文件：
 ```yaml
 # k8s/app/app-hpa.yaml（配置文件）  
@@ -158,6 +141,25 @@ kubectl apply -f k8s/metrics-server/metrics-server-api.yaml
 ```bash
 kubectl apply -f k8s/app/app-hpa.yaml -n account-balance  
 ```
+### 2.8部署应用
+1. 创建Dockerfile：
+
+```dockerfile
+  # Dockerfile（配置文件）
+
+```
+2. 构建应用镜像：
+```bash
+docker build -t account-balance-app:latest .
+```
+
+3. 部署应用：
+```bash
+
+kubectl apply -f k8s/app/app-deployment.yaml -n account-balance
+```
+# 重启整个部署(如果应用部署完后有问题，需要重启整个部署)
+kubectl rollout restart deployment account-balance-app -n account-balance
 
 ## 3. 验证部署
 
@@ -165,6 +167,8 @@ kubectl apply -f k8s/app/app-hpa.yaml -n account-balance
 ```bash
 # 检查所有 Pod
 kubectl get pods -n account-balance
+# 如何进入任意一个运行pod的命令
+kubectl exec -it -n account-balance $(kubectl get pods -n account-balance -l app=account-balance-app -o jsonpath='{.items[0].metadata.name}') -- bash
 
 # 检查所有服务
 kubectl get svc -n account-balance
@@ -182,7 +186,7 @@ kubectl get hpa -n account-balance
 kubectl exec -it $(kubectl get pod -l app=mysql -n account-balance -o jsonpath='{.items[0].metadata.name}') -n account-balance -- mysql -u root -p123456 -e "SELECT 1"
 
 # 测试 Redis 连接
-kubectl exec -it $(kubectl get pod -l app=redis -n account-balance -o jsonpath='{.items[0].metadata.name}') -n account-balance -- redis-cli ping
+kubectl exec -it $(kubectl get pod -l app=redis -n account-balance -o jsonpath='{.items[0].metadata.name}') -n account-balance -- redis-cli -a 123456
 ```
 
 ### 3.3 验证应用访问

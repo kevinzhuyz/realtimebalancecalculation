@@ -32,9 +32,15 @@ public class AccountController {
      * @return 返回包含新创建账户信息的响应实体。
      */
     @PostMapping
-    public ResponseEntity<Account> createAccount(@Valid @RequestBody CreateAccountRequest request) {
-        Account account = accountService.createAccount(request);
-        return ResponseEntity.ok(account);
+    public Account createAccount(@Valid @RequestBody CreateAccountRequest request) {
+        // 将 CreateAccountRequest 转换为 Account
+        Account account = new Account();
+        account.setUserId(request.getUserId());
+        account.setAccountNumber(request.getAccountNumber());
+        account.setBalance(request.getBalance() != null ? request.getBalance() : BigDecimal.ZERO);
+        account.setCreditLimit(request.getCreditLimit());
+        
+        return accountService.createAccount(account);
     }
 
     /**

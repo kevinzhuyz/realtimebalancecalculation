@@ -7,6 +7,7 @@ package com.kevinbank.accountbalancecalculation.model;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
+import com.kevinbank.accountbalancecalculation.entity.Gender;
 
 /**
  * 用户创建请求的数据模型
@@ -34,5 +35,5 @@ public class CreateUserRequest {
      * 性别字段，非必填
      * 提供性别信息，允许用户选择是否填写
      */
-    private String gender;
+    private Gender gender;
 }

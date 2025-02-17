@@ -1,7 +1,8 @@
 package com.kevinbank.accountbalancecalculation.mapper;
 
-import com.kevinbank.accountbalancecalculation.model.User;
+import com.kevinbank.accountbalancecalculation.entity.User;
 import com.kevinbank.accountbalancecalculation.model.CreateUserRequest;
+import com.kevinbank.accountbalancecalculation.model.UserDTO;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 
@@ -22,7 +23,8 @@ public interface UserMapper {
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "passwordHash", ignore = true)
     @Mapping(target = "createdAt", ignore = true)
-    User toUser(CreateUserRequest createUserRequest);
+    User toEntity(CreateUserRequest createUserRequest);
 
+    UserDTO toDTO(User user);
 
 }

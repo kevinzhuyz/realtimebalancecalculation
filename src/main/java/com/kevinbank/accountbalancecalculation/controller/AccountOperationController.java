@@ -1,7 +1,10 @@
 package com.kevinbank.accountbalancecalculation.controller;
 
 import com.kevinbank.accountbalancecalculation.model.Account;
+import com.kevinbank.accountbalancecalculation.model.DepositRequest;
+import com.kevinbank.accountbalancecalculation.model.WithdrawRequest;
 import com.kevinbank.accountbalancecalculation.service.AccountService;
+import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -24,25 +27,21 @@ public class AccountOperationController {
     private AccountService accountService;
 
     /**
-     * 处理存款请求
+     * 存款操作
      *
-     * @param id 账户ID
-     * @param amount 存款金额
+     * @param accountId 账户ID
+     * @param request 存款请求体，包含存款金额
      * @return 更新后的账户信息
      */
-    @PostMapping("/{id}/deposit")
+    @PostMapping("/{accountId}/deposit")
     public ResponseEntity<Account> deposit(
-            @PathVariable Long id,
-            @RequestParam BigDecimal amount) {
-        // 记录存款请求的日志
-        log.info("存款请求 - 账户ID: {}, 金额: {}", id, amount);
+            @PathVariable Long accountId,
+            @Valid @RequestBody DepositRequest request) {
+        log.info("存款请求 - 账户ID: {}, 金额: {}", accountId, request.getAmount());
         try {
-            // 调用服务层方法执行存款操作
-            Account account = accountService.deposit(id, amount);
-            // 返回更新后的账户信息
-            return ResponseEntity.ok(account);
+            Account updatedAccount = accountService.deposit(accountId, request.getAmount());
+            return ResponseEntity.ok(updatedAccount);
         } catch (Exception e) {
-            // 记录存款失败的错误日志
             log.error("存款失败", e);
             throw e;
         }
@@ -51,23 +50,19 @@ public class AccountOperationController {
     /**
      * 处理取款请求
      *
-     * @param id 账户ID
-     * @param amount 取款金额
+     * @param accountId 账户ID
+     * @param request 取款请求体，包含取款金额
      * @return 更新后的账户信息
      */
-    @PostMapping("/{id}/withdraw")
+    @PostMapping("/{accountId}/withdraw")
     public ResponseEntity<Account> withdraw(
-            @PathVariable Long id,
-            @RequestParam BigDecimal amount) {
-        // 记录取款请求的日志
-        log.info("取款请求 - 账户ID: {}, 金额: {}", id, amount);
+            @PathVariable Long accountId,
+            @Valid @RequestBody WithdrawRequest request) {
+        log.info("取款请求 - 账户ID: {}, 金额: {}", accountId, request.getAmount());
         try {
-            // 调用服务层方法执行取款操作
-            Account account = accountService.withdraw(id, amount);
-            // 返回更新后的账户信息
+            Account account = accountService.withdraw(accountId, request.getAmount());
             return ResponseEntity.ok(account);
         } catch (Exception e) {
-            // 记录取款失败的错误日志
             log.error("取款失败", e);
             throw e;
         }

@@ -41,7 +41,7 @@ public class Account {
     /**
      * 账户余额，默认为0。
      */
-    @Column(nullable = false)
+    @Column(name = "balance", precision = 10, scale = 2, nullable = false)
     @JsonSerialize
     private BigDecimal balance = BigDecimal.ZERO;
 
